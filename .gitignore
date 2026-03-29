@@ -1,0 +1,17 @@
+# 敏感設定（token 儲存在 ~/.claude/plugins/data/export-chat-logs/.env，不在 repo 內）
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# macOS
+.DS_Store
+
+# 測試暫存
+/tmp/
+
+# Claude Code
+.claude/

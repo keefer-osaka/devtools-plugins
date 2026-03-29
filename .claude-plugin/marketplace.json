@@ -1,0 +1,28 @@
+{
+  "name": "devtools-plugins",
+  "owner": {
+    "name": "keefer-osaka"
+  },
+  "metadata": {
+    "description": "Export Claude Code and Cursor chat logs as Markdown, zip them, and send via Telegram.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "export-chat-logs",
+      "source": {
+        "source": "github",
+        "repo": "keefer-osaka/devtools-plugins"
+      },
+      "description": "Export Claude Code and Cursor chat logs as Markdown, zip them, and send via Telegram.",
+      "version": "0.1.0",
+      "author": {
+        "name": "keefer-osaka"
+      },
+      "homepage": "https://github.com/keefer-osaka/devtools-plugins",
+      "repository": "https://github.com/keefer-osaka/devtools-plugins",
+      "license": "MIT",
+      "keywords": ["chat-logs", "export", "telegram", "cursor", "claude-code", "markdown"]
+    }
+  ]
+}
