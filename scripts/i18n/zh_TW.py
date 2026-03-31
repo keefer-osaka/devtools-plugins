@@ -5,6 +5,7 @@ S = {
     "label_project": "專案",
     "label_source": "來源",
     "source_name": "Claude Code",
+    "source_name_cowork": "Claude Cowork",
     "label_model": "模型",
     "label_messages": "訊息數",
     "no_messages": "*(無有效訊息)*",
@@ -13,7 +14,8 @@ S = {
     "msg_done_convert": "完成：{n} 則訊息 → {path}",
 
     # generate_stats.py - report header
-    "report_title": "Claude Code Token 使用報告",
+    "report_title": "Claude Code 使用報告",
+    "report_title_cowork": "Claude Cowork 使用報告",
     "label_period": "期間",
     "label_generated": "產生時間",
     "label_sessions": "對話數",
@@ -56,7 +58,8 @@ S = {
     "untitled": "*(未命名)*",
     "no_sessions_found": "*(未找到任何對話)*",
     "skipped_sessions": "（已略過 {n} 筆無實質內容的對話）",
-    "msg_stats_done": "✅ Claude Code 統計報告：{sessions} 個對話，共 {tokens} tokens → {path}",
+    "msg_stats_done": "✅ Claude Code 使用報告：{sessions} 個對話，共 {tokens} tokens → {path}",
+    "msg_stats_done_cowork": "✅ Claude Cowork 使用報告：{sessions} 個對話，共 {tokens} tokens → {path}",
     "warn_no_files": "⚠️  未找到 JSONL 檔案，寫入空報告。",
 
     # generate_stats.py - tool usage section

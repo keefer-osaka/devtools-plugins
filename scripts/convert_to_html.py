@@ -255,8 +255,14 @@ def _md_to_html(text):
 
 # ── HTML formatter ─────────────────────────────────────────────────────────────
 
-def format_html(messages, first_ts, cwd=None, title=None, models=None):
-    display_title = _html.escape(title or "Claude Code")
+def format_html(messages, first_ts, cwd=None, title=None, models=None, source_label=None):
+    if source_label == "cowork":
+        fallback_title = cwd.rstrip("/").split("/")[-1] if cwd else "Claude Cowork"
+        display_title = _html.escape(title or fallback_title)
+        source_display = S["source_name_cowork"]
+    else:
+        display_title = _html.escape(title or "Claude Code")
+        source_display = S["source_name"]
     lang_attr = "zh-TW" if LANG_CODE == "zh-TW" else "en"
 
     date_str = ""
@@ -274,7 +280,7 @@ def format_html(messages, first_ts, cwd=None, title=None, models=None):
     if cwd:
         folder_name = _html.escape(Path(cwd).name or cwd)
         meta_items.append(f'<span class="meta-item">{_html.escape(S["label_project"])}: <b>{folder_name}</b></span>')
-    meta_items.append(f'<span class="meta-item">{_html.escape(S["label_source"])}: <b>{_html.escape(S["source_name"])}</b></span>')
+    meta_items.append(f'<span class="meta-item">{_html.escape(S["label_source"])}: <b>{_html.escape(source_display)}</b></span>')
     if models:
         meta_items.append(f'<span class="meta-item">{_html.escape(S["label_model"])}: <b>{_html.escape(", ".join(models))}</b></span>')
     meta_items.append(f'<span class="meta-item">{_html.escape(S["label_messages"])}: <b>{len(messages)}</b></span>')
@@ -349,6 +355,7 @@ def main():
     input_path = sys.argv[1]
     out_dir = sys.argv[2]
     days_filter = None
+    source_label = None
 
     if "--days" in sys.argv:
         idx = sys.argv.index("--days")
@@ -357,6 +364,11 @@ def main():
                 days_filter = int(sys.argv[idx + 1])
             except ValueError:
                 pass
+
+    if "--source-label" in sys.argv:
+        idx = sys.argv.index("--source-label")
+        if idx + 1 < len(sys.argv):
+            source_label = sys.argv[idx + 1]
 
     messages, first_ts, last_ts, title, cwd, models = convert_claude_jsonl(input_path)
 
@@ -376,7 +388,7 @@ def main():
         except Exception:
             pass
 
-    html_content = format_html(messages, active_ts, cwd=cwd, title=title, models=models)
+    html_content = format_html(messages, active_ts, cwd=cwd, title=title, models=models, source_label=source_label)
 
     os.makedirs(out_dir, exist_ok=True)
     output_path = make_output_path(out_dir, active_ts, title, ext=".html")

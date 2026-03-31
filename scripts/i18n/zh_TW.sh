@@ -15,12 +15,19 @@ SUMMARY_SIZE="💾 檔案大小：%ZIP_SIZE%"
 SUMMARY_FORMAT_HTML="📝 格式：HTML（語法高亮 + 互動式圖表）"
 SUMMARY_FORMAT_MD="📝 格式：Markdown（已省略工具呼叫與技術細節）"
 MSG_DONE="✅ 完成！Claude Code：%CC_SESSIONS% 個對話，壓縮檔：%ZIP_SIZE%，已傳送至 Telegram"
-STATS_REPORT_SLUG="claude-code_統計報告"
+STATS_REPORT_SLUG="claude-code_使用報告"
+STATS_REPORT_SLUG_COWORK="claude-cowork_使用報告"
+
+# Cowork
+SUMMARY_STATS_COWORK="📊 統計：%CC_SESSIONS% 個對話（Claude Code）+ %CW_SESSIONS% 個對話（Claude Cowork）"
+MSG_DONE_COWORK="✅ 完成！Claude Code：%CC_SESSIONS% 個對話，Claude Cowork：%CW_SESSIONS% 個對話，壓縮檔：%ZIP_SIZE%，已傳送至 Telegram"
+LABEL_COWORK_SET="包含 Cowork：%VALUE%"
+LABEL_COWORK_UNSET="包含 Cowork：（未設定，預設 false）"
 
 # save-token.sh
 ERR_TOKEN_REQUIRED="❌ 需要提供 Token：bash save-token.sh <token> <chat_id> [timezone] [lang] [format]"
 ERR_CHATID_REQUIRED="❌ 需要提供 Chat ID：bash save-token.sh <token> <chat_id> [timezone] [lang] [format]"
-MSG_CONFIG_SAVED="✅ 設定已儲存（Token + Chat ID + 時區 %TZ_LABEL% + 語言 %LANG% + 格式 %FORMAT%）"
+MSG_CONFIG_SAVED="✅ 設定已儲存（Token + Chat ID + 時區 %TZ_LABEL% + 語言 %LANG% + 格式 %FORMAT% + Cowork %COWORK%）"
 
 # setup.sh - labels
 LABEL_BOT_TOKEN_SET="Bot Token：%VALUE%"

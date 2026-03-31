@@ -173,6 +173,8 @@ def find_recent_jsonl(projects_dir, days):
     if not Path(projects_dir).is_dir():
         return results
     for jsonl in Path(projects_dir).rglob("*.jsonl"):
+        if jsonl.name == "audit.jsonl":
+            continue
         parts = set(jsonl.parts)
         if "subagents" in parts or "memory" in parts:
             continue
@@ -192,14 +194,23 @@ def _compute_conv_link(s, conv_base, report_path):
     filepath  = s.get("filepath")
     if not active_ts or not filepath or not conv_base:
         return None
-    project_dir  = Path(filepath).parent.name
-    home_encoded = os.path.expanduser("~").replace("/", "-")
-    if project_dir.startswith(home_encoded + "-"):
-        project_display = project_dir[len(home_encoded) + 1:]
-    elif project_dir == home_encoded:
-        project_display = ""
+
+    claude_projects = os.path.join(os.path.expanduser("~"), ".claude", "projects")
+    if str(filepath).startswith(claude_projects):
+        # Normal Claude Code path: derive project_display from filesystem path
+        project_dir  = Path(filepath).parent.name
+        home_encoded = os.path.expanduser("~").replace("/", "-")
+        if project_dir.startswith(home_encoded + "-"):
+            project_display = project_dir[len(home_encoded) + 1:]
+        elif project_dir == home_encoded:
+            project_display = ""
+        else:
+            project_display = project_dir
     else:
-        project_display = project_dir
+        # Cowork path: derive project_display from virtual cwd last segment
+        cwd = s.get("cwd", "")
+        project_display = cwd.rstrip("/").split("/")[-1] if cwd else Path(filepath).parent.name
+
     fname = os.path.basename(make_output_path(".", active_ts, s.get("title"), ext=".html"))
     if project_display:
         target = os.path.join(conv_base, project_display, fname)
@@ -302,7 +313,7 @@ def ascii_bar(data, total, width=24):
     return "\n".join(lines)
 
 
-def generate_report(sessions, days, out_path, skipped=0):
+def generate_report(sessions, days, out_path, skipped=0, source_label=None):
     now_str    = datetime.now(TZ_LOCAL).strftime("%Y-%m-%d %H:%M") + f" {TZ_LABEL}"
     start_date = (datetime.now(TZ_LOCAL) - timedelta(days=days)).strftime("%Y-%m-%d")
     end_date   = datetime.now(TZ_LOCAL).strftime("%Y-%m-%d")
@@ -319,9 +330,11 @@ def generate_report(sessions, days, out_path, skipped=0):
     proj_sessions  = d["proj_sessions"]
     model_sessions = d["model_sessions"]
 
+    report_title = S["report_title_cowork"] if source_label == "cowork" else S["report_title"]
+
     L = []
     L += [
-        f"# {S['report_title']}", "",
+        f"# {report_title}", "",
         f"**{S['label_period']}:** {start_date} – {end_date} (last {days} days)",
         f"**{S['label_generated']}:** {now_str}",
         f"**{S['label_sessions']}:** {len(sessions)}"
@@ -493,7 +506,8 @@ def generate_report(sessions, days, out_path, skipped=0):
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     Path(out_path).write_text("\n".join(L), encoding="utf-8")
-    print(S["msg_stats_done"].format(sessions=len(sessions), tokens=fmt(total_all), path=out_path))
+    msg_key = "msg_stats_done_cowork" if source_label == "cowork" else "msg_stats_done"
+    print(S[msg_key].format(sessions=len(sessions), tokens=fmt(total_all), path=out_path))
 
 
 # ── HTML report ────────────────────────────────────────────────────────────────
@@ -571,7 +585,7 @@ a.conv-link { color: var(--link); text-decoration: none; }
 a.conv-link:hover { text-decoration: underline; }
 .bar-chart { width: 100%; margin: 12px 0; }
 .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
-.bar-label { flex: 0 0 140px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.bar-label { flex: 0 0 220px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .bar-track { flex: 1; background: var(--bg-alt); border-radius: 3px; height: 16px; border: 1px solid var(--border); }
 .bar-fill { height: 100%; border-radius: 3px; min-width: 2px; }
 .bar-pct { flex: 0 0 42px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -630,7 +644,7 @@ def _bar_chart_html(data, total, show_count=True):
     return "\n".join(parts)
 
 
-def generate_html_report(sessions, days, out_path, conv_base=None, skipped=0):
+def generate_html_report(sessions, days, out_path, conv_base=None, skipped=0, source_label=None):
     now_str    = datetime.now(TZ_LOCAL).strftime("%Y-%m-%d %H:%M") + f" {TZ_LABEL}"
     start_date = (datetime.now(TZ_LOCAL) - timedelta(days=days)).strftime("%Y-%m-%d")
     end_date   = datetime.now(TZ_LOCAL).strftime("%Y-%m-%d")
@@ -648,7 +662,8 @@ def generate_html_report(sessions, days, out_path, conv_base=None, skipped=0):
     proj_sessions  = d["proj_sessions"]
     model_sessions = d["model_sessions"]
 
-    title_esc = _html.escape(S["report_title"])
+    report_title = S["report_title_cowork"] if source_label == "cowork" else S["report_title"]
+    title_esc = _html.escape(report_title)
     parts = []
 
     # Header
@@ -771,7 +786,7 @@ def generate_html_report(sessions, days, out_path, conv_base=None, skipped=0):
             cat_disp  = S.get(f"cat_{s['category']}", s['category'])
             dur_str   = fmt_duration(s["duration"]) if s.get("duration") is not None else "-"
 
-            link = _compute_conv_link(s, conv_base, out_path) if conv_base else None
+            link = _compute_conv_link(s, conv_base, out_path)
             if link:
                 title_cell = (
                     f'<td><a class="conv-link" href="{_html.escape(link)}" target="_blank">'
@@ -833,22 +848,29 @@ def generate_html_report(sessions, days, out_path, conv_base=None, skipped=0):
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     Path(out_path).write_text(html_doc, encoding="utf-8")
-    print(S["msg_stats_done"].format(sessions=len(sessions), tokens=fmt(total_all), path=out_path))
+    msg_key = "msg_stats_done_cowork" if source_label == "cowork" else "msg_stats_done"
+    print(S[msg_key].format(sessions=len(sessions), tokens=fmt(total_all), path=out_path))
 
 
 # ── main ───────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--projects", required=True, help="Claude Code projects directory")
+    parser.add_argument("--projects", action="append", required=True,
+                        help="Projects directory (may be specified multiple times)")
     parser.add_argument("--days",   type=int, default=7)
     parser.add_argument("--out",    required=True)
     parser.add_argument("--format", choices=["md", "html"], default="md", dest="fmt")
     parser.add_argument("--conv-base", default=None,
                         help="Base directory of conversation HTML files (for linking)")
+    parser.add_argument("--source-label", default=None, choices=["cowork"],
+                        help="Label for report title/output message (omit for Claude Code)")
     args = parser.parse_args()
 
-    jsonl_files = find_recent_jsonl(args.projects, args.days)
+    jsonl_files = []
+    for proj_dir in args.projects:
+        jsonl_files.extend(find_recent_jsonl(proj_dir, args.days))
+
     cutoff_dt = datetime.now(timezone.utc) - timedelta(days=args.days)
     sessions = []
     skipped = 0
@@ -916,9 +938,9 @@ def main():
         return
 
     if args.fmt == "html":
-        generate_html_report(sessions, args.days, args.out, conv_base=args.conv_base, skipped=skipped)
+        generate_html_report(sessions, args.days, args.out, conv_base=args.conv_base, skipped=skipped, source_label=args.source_label)
     else:
-        generate_report(sessions, args.days, args.out, skipped=skipped)
+        generate_report(sessions, args.days, args.out, skipped=skipped, source_label=args.source_label)
 
 
 if __name__ == "__main__":

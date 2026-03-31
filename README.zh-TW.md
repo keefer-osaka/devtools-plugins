@@ -1,6 +1,8 @@
 # export-chat-logs
 
-Claude Code plugin — 收集 Claude Code 聊天記錄，轉換為 HTML 或 Markdown 格式，打包成 zip，並透過 Telegram 傳送。
+Claude Code plugin — 收集 Claude Code 與 Cowork 聊天記錄，轉換為 HTML 或 Markdown 格式，打包成 zip，並透過 Telegram 傳送。
+
+> **注意：** 本 plugin 支援 **Claude Code (CLI)** 對話紀錄。**Claude Cowork** 的對話也可選擇性包含（需手動開啟，僅限 macOS）。Claude Desktop Chat 和 claude.ai 網頁版的對話存放於 Anthropic 伺服器端，無法透過本地檔案取得。
 
 [English](README.md)
 
@@ -45,16 +47,16 @@ claude --plugin-dir /path/to/devtools-plugins
 /export-chat-logs:setup
 ```
 
-依提示輸入：
+畫面會顯示設定項目編號選單，輸入要修改的編號（例如 `3 6`），只針對選定的項目回答：
+
 - **Bot Token**：在 Telegram 找到 `@BotFather` → `/mybots` → 選擇你的 bot → API Token
 - **Chat ID**：在 Telegram 找到 `@userinfobot`，傳送任意訊息，它會回覆你的 chat_id
-- **時區偏移**：整數，例如 `8`（UTC+8，台灣）、`9`（UTC+9，日本）、`-5`（UTC-5，EST）；預設為 `8`
-- **語言**：`en`（英文）或 `zh-TW`（繁體中文）；預設為 `en`
-- **輸出格式**：`html`（語法高亮 + 互動式圖表）或 `md`（純 Markdown）；預設為 `html`
+- **時區偏移**：整數，例如 `8`（UTC+8，台灣）、`9`（UTC+9，日本）；預設為 `8`
+- **語言**：`1` 英文 / `2` 繁體中文；預設為英文
+- **輸出格式**：`1` HTML（語法高亮 + 互動式圖表）/ `2` Markdown；預設為 HTML
+- **包含 Cowork**：`1` 包含 / `2` 不包含；是否包含 Claude Cowork 對話（僅限 macOS）；預設為不包含
 
 設定儲存於 `~/.config/devtools-plugins/export-chat-logs/.env`（權限 600，不納入 repo）。
-
-如需修改單一設定，重新執行 `/export-chat-logs:setup`，不想更改的欄位輸入 `skip` 保留現有值。
 
 ---
 
@@ -93,9 +95,10 @@ claude -p "upload chat logs 14" --allowedTools "Bash,Read"
 ## 匯出內容
 
 - Claude Code：來自 `~/.claude/projects/` 的 JSONL 對話記錄
+- Claude Cowork（選擇性）：來自 `~/Library/Application Support/Claude/` 的對話記錄（僅限 macOS）
 - 每個對話轉換為一個 HTML 檔案（或 Markdown，依設定而定）
 - HTML 包含語法高亮（highlight.js）與互動式圖表（Mermaid.js）
-- 包含統計報告（對話數、模型用量、分類統計）
+- 包含統計報告（對話數、模型用量、工具用量、分類統計）
 - 打包成 zip 並傳送至 Telegram
 
 ---

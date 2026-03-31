@@ -25,6 +25,8 @@ TELEGRAM_BOT_TOKEN=$(grep 'TELEGRAM_BOT_TOKEN' "$ENV_FILE" | cut -d'=' -f2 | tr 
 CHAT_ID=$(grep 'TELEGRAM_CHAT_ID' "$ENV_FILE" | cut -d'=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ')
 OUTPUT_FORMAT=$(grep 'OUTPUT_FORMAT' "$ENV_FILE" | cut -d'=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ')
 OUTPUT_FORMAT="${OUTPUT_FORMAT:-html}"
+INCLUDE_COWORK=$(grep 'INCLUDE_COWORK' "$ENV_FILE" | cut -d'=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ')
+INCLUDE_COWORK="${INCLUDE_COWORK:-false}"
 
 # Select converter based on output format
 if [ "$OUTPUT_FORMAT" = "html" ]; then
@@ -46,6 +48,9 @@ EXPORT_DATE=$(date +%Y%m%d)
 TMPDIR_PATH="$TMPDIR/chat-export-${EXPORT_DATE}-$$"
 rm -rf "$TMPDIR_PATH"
 mkdir -p "$TMPDIR_PATH/claude-code"
+if [ "$INCLUDE_COWORK" = "true" ]; then
+  mkdir -p "$TMPDIR_PATH/claude-cowork"
+fi
 
 # Strip home directory prefix from project folder name (e.g. -Users-user-foo-bar → foo-bar)
 HOME_ENCODED=$(echo "$HOME" | tr '/' '-')
@@ -65,8 +70,34 @@ done < <(find "$HOME/.claude/projects" -name "*.jsonl" \
   -not -path "*/memory/*" \
   -mtime -"$DAYS" 2>/dev/null)
 
+# Convert Claude Cowork sessions (opt-in, macOS only)
+CW_COUNT=0
+COWORK_PATHS=()
+if [ "$INCLUDE_COWORK" = "true" ]; then
+  COWORK_PATHS=(
+    "$HOME/Library/Application Support/Claude/local-agent-mode-sessions"
+    "$HOME/Library/Application Support/Claude/claude-code-sessions"
+  )
+  for COWORK_BASE in "${COWORK_PATHS[@]}"; do
+    [ -d "$COWORK_BASE" ] || continue
+    while IFS= read -r jsonl_file; do
+      [ -z "$jsonl_file" ] && continue
+      CW_PROJECT=$(python3 "$PLUGIN_ROOT/scripts/common.py" --extract-cwd "$jsonl_file" 2>/dev/null)
+      CW_PROJECT="${CW_PROJECT:-unknown}"
+      OUT_DIR="$TMPDIR_PATH/claude-cowork/$CW_PROJECT"
+      mkdir -p "$OUT_DIR"
+      python3 -c "import sys; sys.path.insert(0,'$PLUGIN_ROOT/scripts'); from common import is_trivial_session; sys.exit(0 if is_trivial_session(sys.argv[1]) else 1)" "$jsonl_file" 2>/dev/null && continue
+      python3 "$CONVERTER" "$jsonl_file" "$OUT_DIR" --days "$DAYS" --source-label cowork >/dev/null 2>&1 && CW_COUNT=$((CW_COUNT + 1))
+    done < <(find "$COWORK_BASE" -name "*.jsonl" \
+      -not -path "*/subagents/*" \
+      -not -path "*/memory/*" \
+      -not -name "audit.jsonl" \
+      -mtime -"$DAYS" 2>/dev/null)
+  done
+fi
+
 # Exit early if no sessions found
-if [ "$CC_COUNT" -eq 0 ]; then
+if [ "$CC_COUNT" -eq 0 ] && [ "$CW_COUNT" -eq 0 ]; then
   echo "${WARN_NO_SESSIONS//%DAYS%/$DAYS}"
   rm -rf "$TMPDIR_PATH"
   exit 0
@@ -75,12 +106,33 @@ fi
 # Generate stats report
 STATS_DATE=$(date +%Y-%m-%d_%H-%M)
 STATS_EXT=$( [ "$OUTPUT_FORMAT" = "html" ] && echo "html" || echo "md" )
-STATS_FILE="$TMPDIR_PATH/${STATS_DATE}_${STATS_REPORT_SLUG}.${STATS_EXT}"
-python3 "$STATS_SCRIPT" --projects "$HOME/.claude/projects" --days "$DAYS" \
+
+# Claude Code stats
+CC_STATS_FILE="$TMPDIR_PATH/${STATS_DATE}_${STATS_REPORT_SLUG}.${STATS_EXT}"
+python3 "$STATS_SCRIPT" \
+  --projects "$HOME/.claude/projects" \
+  --days "$DAYS" \
   --format "$OUTPUT_FORMAT" \
-  --out "$STATS_FILE" \
+  --out "$CC_STATS_FILE" \
   --conv-base "$TMPDIR_PATH/claude-code" >/dev/null 2>&1
-CC_SESSIONS=$(grep '^\*\*Sessions:\*\*' "$STATS_FILE" 2>/dev/null | grep -o '[0-9]*' | head -1)
+
+# Claude Cowork stats (only when there are Cowork sessions)
+if [ "$INCLUDE_COWORK" = "true" ] && [ "$CW_COUNT" -gt 0 ]; then
+  CW_STATS_FILE="$TMPDIR_PATH/${STATS_DATE}_${STATS_REPORT_SLUG_COWORK}.${STATS_EXT}"
+  CW_STATS_CMD=(python3 "$STATS_SCRIPT"
+    --days "$DAYS"
+    --format "$OUTPUT_FORMAT"
+    --out "$CW_STATS_FILE"
+    --conv-base "$TMPDIR_PATH/claude-cowork"
+    --source-label cowork
+  )
+  for COWORK_BASE in "${COWORK_PATHS[@]}"; do
+    [ -d "$COWORK_BASE" ] && CW_STATS_CMD+=(--projects "$COWORK_BASE")
+  done
+  "${CW_STATS_CMD[@]}" >/dev/null 2>&1
+fi
+
+CC_SESSIONS=$(grep '^\*\*Sessions:\*\*' "$CC_STATS_FILE" 2>/dev/null | grep -o '[0-9]*' | head -1)
 CC_SESSIONS="${CC_SESSIONS:-$CC_COUNT}"
 
 # Package as zip
@@ -104,7 +156,12 @@ else
 fi
 _s1="${SUMMARY_USER//%GIT_USER%/$GIT_USER}"
 _s2="${SUMMARY_PERIOD//%START_DATE%/$START_DATE}"; _s2="${_s2//%TODAY%/$TODAY}"; _s2="${_s2//%DAYS%/$DAYS}"
-_s3="${SUMMARY_STATS//%CC_SESSIONS%/$CC_SESSIONS}"
+if [ "$INCLUDE_COWORK" = "true" ] && [ "$CW_COUNT" -gt 0 ]; then
+  _s3="${SUMMARY_STATS_COWORK//%CC_SESSIONS%/$CC_SESSIONS}"
+  _s3="${_s3//%CW_SESSIONS%/$CW_COUNT}"
+else
+  _s3="${SUMMARY_STATS//%CC_SESSIONS%/$CC_SESSIONS}"
+fi
 _s4="${SUMMARY_SIZE//%ZIP_SIZE%/$ZIP_SIZE}"
 if [ "$OUTPUT_FORMAT" = "html" ]; then
   _s5="$SUMMARY_FORMAT_HTML"
@@ -147,5 +204,12 @@ fi
 
 # Clean up temp directory
 rm -rf "$TMPDIR_PATH"
-_done="${MSG_DONE//%CC_SESSIONS%/$CC_SESSIONS}"; _done="${_done//%ZIP_SIZE%/$ZIP_SIZE}"
+if [ "$INCLUDE_COWORK" = "true" ] && [ "$CW_COUNT" -gt 0 ]; then
+  _done="${MSG_DONE_COWORK//%CC_SESSIONS%/$CC_SESSIONS}"
+  _done="${_done//%CW_SESSIONS%/$CW_COUNT}"
+  _done="${_done//%ZIP_SIZE%/$ZIP_SIZE}"
+else
+  _done="${MSG_DONE//%CC_SESSIONS%/$CC_SESSIONS}"
+  _done="${_done//%ZIP_SIZE%/$ZIP_SIZE}"
+fi
 echo "$_done"

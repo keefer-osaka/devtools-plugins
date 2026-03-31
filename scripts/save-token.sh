@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# save-token.sh - Save Telegram Bot Token, chat_id, timezone offset, language, and output format
-# Usage: bash save-token.sh [token] [chat_id] [timezone_offset] [lang] [format]
+# save-token.sh - Save Telegram Bot Token, chat_id, timezone offset, language, output format, and Cowork inclusion
+# Usage: bash save-token.sh [token] [chat_id] [timezone_offset] [lang] [format] [include_cowork]
 #   Pass empty string "" or "skip" or "-" to keep the existing value for any argument.
-#   timezone_offset: integer, e.g. 8 for UTC+8 (Taiwan), -5 for UTC-5 (EST), default 8
+#   timezone_offset: integer, e.g. 8 for UTC+8 (Taiwan), 9 for UTC+9 (Japan), default 8
 #   lang: en or zh-TW, default en
 #   format: html or md, default html
+#   include_cowork: true or false, default false
 
 DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devtools-plugins/export-chat-logs"
 ENV_FILE="$DATA_DIR/.env"
@@ -19,7 +20,8 @@ mkdir -p "$DATA_DIR"
 [ "$2" = "skip" ] || [ "$2" = "-" ] && set -- "$1" "" "${@:3}"
 [ "$3" = "skip" ] || [ "$3" = "-" ] && set -- "$1" "$2" "" "${@:4}"
 [ "$4" = "skip" ] || [ "$4" = "-" ] && set -- "$1" "$2" "$3" "" "${@:5}"
-[ "$5" = "skip" ] || [ "$5" = "-" ] && set -- "$1" "$2" "$3" "$4" ""
+[ "$5" = "skip" ] || [ "$5" = "-" ] && set -- "$1" "$2" "$3" "$4" "" "$6"
+[ "$6" = "skip" ] || [ "$6" = "-" ] && set -- "$1" "$2" "$3" "$4" "$5" ""
 
 # Token: use first argument if provided, otherwise keep existing, otherwise error
 if [ -n "$1" ]; then
@@ -79,11 +81,22 @@ else
   OUTPUT_FORMAT="html"
 fi
 
-printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nTIMEZONE_OFFSET=%s\nPLUGIN_LANG=%s\nOUTPUT_FORMAT=%s\n' \
-  "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$TZ_OFFSET" "$PLUGIN_LANG" "$OUTPUT_FORMAT" > "$ENV_FILE"
+# Include Cowork: use sixth argument if provided, otherwise keep existing setting, otherwise default to false
+if [ -n "$6" ]; then
+  INCLUDE_COWORK="$6"
+elif [ -f "$ENV_FILE" ]; then
+  INCLUDE_COWORK=$(grep 'INCLUDE_COWORK' "$ENV_FILE" | cut -d'=' -f2 | tr -d '"' | tr -d "'" | tr -d ' ')
+  INCLUDE_COWORK="${INCLUDE_COWORK:-false}"
+else
+  INCLUDE_COWORK="false"
+fi
+
+printf 'TELEGRAM_BOT_TOKEN=%s\nTELEGRAM_CHAT_ID=%s\nTIMEZONE_OFFSET=%s\nPLUGIN_LANG=%s\nOUTPUT_FORMAT=%s\nINCLUDE_COWORK=%s\n' \
+  "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_CHAT_ID" "$TZ_OFFSET" "$PLUGIN_LANG" "$OUTPUT_FORMAT" "$INCLUDE_COWORK" > "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 TZ_LABEL=$(printf "UTC%+d" "$TZ_OFFSET")
 _msg="${MSG_CONFIG_SAVED//%TZ_LABEL%/$TZ_LABEL}"
 _msg="${_msg//%LANG%/$PLUGIN_LANG}"
 _msg="${_msg//%FORMAT%/$OUTPUT_FORMAT}"
+_msg="${_msg//%COWORK%/$INCLUDE_COWORK}"
 echo "$_msg"

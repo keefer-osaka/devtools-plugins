@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 from common import S, TZ_LOCAL, TZ_LABEL, truncate, convert_claude_jsonl, make_output_path
 
 
-def format_markdown(messages, first_ts, cwd=None, title=None, models=None):
+def format_markdown(messages, first_ts, cwd=None, title=None, models=None, source_label=None):
     lines = []
 
     date_str = ""
@@ -24,7 +24,13 @@ def format_markdown(messages, first_ts, cwd=None, title=None, models=None):
         except Exception:
             date_str = first_ts
 
-    display_title = title or "Claude Code"
+    if source_label == "cowork":
+        fallback_title = cwd.rstrip("/").split("/")[-1] if cwd else "Claude Cowork"
+        display_title = title or fallback_title
+        source_display = S["source_name_cowork"]
+    else:
+        display_title = title or "Claude Code"
+        source_display = S["source_name"]
     lines.append(f"# {display_title}")
     lines.append("")
 
@@ -33,7 +39,7 @@ def format_markdown(messages, first_ts, cwd=None, title=None, models=None):
     if cwd:
         folder_name = Path(cwd).name or cwd
         lines.append(f"**{S['label_project']}:** {folder_name} (`{cwd}`)")
-    lines.append(f"**{S['label_source']}:** {S['source_name']}")
+    lines.append(f"**{S['label_source']}:** {source_display}")
     if models:
         lines.append(f"**{S['label_model']}:** {', '.join(models)}")
     lines.append(f"**{S['label_messages']}:** {len(messages)}")
@@ -74,6 +80,7 @@ def main():
     input_path = sys.argv[1]
     out_dir = sys.argv[2]
     days_filter = None
+    source_label = None
 
     if "--days" in sys.argv:
         idx = sys.argv.index("--days")
@@ -82,6 +89,11 @@ def main():
                 days_filter = int(sys.argv[idx + 1])
             except ValueError:
                 pass
+
+    if "--source-label" in sys.argv:
+        idx = sys.argv.index("--source-label")
+        if idx + 1 < len(sys.argv):
+            source_label = sys.argv[idx + 1]
 
     messages, first_ts, last_ts, title, cwd, models = convert_claude_jsonl(input_path)
 
@@ -101,7 +113,7 @@ def main():
         except Exception:
             pass
 
-    md = format_markdown(messages, active_ts, cwd=cwd, title=title, models=models)
+    md = format_markdown(messages, active_ts, cwd=cwd, title=title, models=models, source_label=source_label)
 
     os.makedirs(out_dir, exist_ok=True)
     output_path = make_output_path(out_dir, active_ts, title, ext=".md")

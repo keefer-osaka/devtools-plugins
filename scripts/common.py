@@ -4,6 +4,7 @@
 import json
 import re
 import os
+import sys
 import importlib.util
 from datetime import datetime, timezone, timedelta
 
@@ -233,3 +234,20 @@ def make_output_path(out_dir, first_ts, title, ext=".md"):
     else:
         filename = f"{date_str}{ext}"
     return os.path.join(out_dir, filename)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) >= 3 and sys.argv[1] == "--extract-cwd":
+        with open(sys.argv[2], encoding="utf-8", errors="ignore") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if not _line:
+                    continue
+                try:
+                    _obj = json.loads(_line)
+                    _cwd = _obj.get("cwd", "")
+                    if _cwd:
+                        print(_cwd.rstrip("/").split("/")[-1])
+                        break
+                except Exception:
+                    pass

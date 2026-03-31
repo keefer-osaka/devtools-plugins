@@ -15,12 +15,19 @@ SUMMARY_SIZE="💾 File size: %ZIP_SIZE%"
 SUMMARY_FORMAT_HTML="📝 Format: HTML (syntax highlighting + interactive charts)"
 SUMMARY_FORMAT_MD="📝 Format: Markdown (tool calls and technical details omitted)"
 MSG_DONE="✅ Done! Claude Code: %CC_SESSIONS% sessions, zip: %ZIP_SIZE%, sent to Telegram"
-STATS_REPORT_SLUG="claude-code_stats-report"
+STATS_REPORT_SLUG="claude-code_usage-report"
+STATS_REPORT_SLUG_COWORK="claude-cowork_usage-report"
+
+# Cowork
+SUMMARY_STATS_COWORK="📊 Stats: %CC_SESSIONS% sessions (Claude Code) + %CW_SESSIONS% sessions (Claude Cowork)"
+MSG_DONE_COWORK="✅ Done! Claude Code: %CC_SESSIONS% sessions, Claude Cowork: %CW_SESSIONS% sessions, zip: %ZIP_SIZE%, sent to Telegram"
+LABEL_COWORK_SET="Include Cowork: %VALUE%"
+LABEL_COWORK_UNSET="Include Cowork: (not set, default false)"
 
 # save-token.sh
 ERR_TOKEN_REQUIRED="❌ Token required: bash save-token.sh <token> <chat_id> [timezone] [lang] [format]"
 ERR_CHATID_REQUIRED="❌ Chat ID required: bash save-token.sh <token> <chat_id> [timezone] [lang] [format]"
-MSG_CONFIG_SAVED="✅ Configuration saved (Token + Chat ID + Timezone %TZ_LABEL% + Language %LANG% + Format %FORMAT%)"
+MSG_CONFIG_SAVED="✅ Configuration saved (Token + Chat ID + Timezone %TZ_LABEL% + Language %LANG% + Format %FORMAT% + Cowork %COWORK%)"
 
 # setup.sh - labels
 LABEL_BOT_TOKEN_SET="Bot Token: %VALUE%"

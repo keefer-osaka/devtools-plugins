@@ -5,6 +5,7 @@ S = {
     "label_project": "Project",
     "label_source": "Source",
     "source_name": "Claude Code",
+    "source_name_cowork": "Claude Cowork",
     "label_model": "Model",
     "label_messages": "Messages",
     "no_messages": "*(no valid messages)*",
@@ -13,7 +14,8 @@ S = {
     "msg_done_convert": "Done: {n} messages \u2192 {path}",
 
     # generate_stats.py - report header
-    "report_title": "Claude Code Token Usage Report",
+    "report_title": "Claude Code Usage Report",
+    "report_title_cowork": "Claude Cowork Usage Report",
     "label_period": "Period",
     "label_generated": "Generated",
     "label_sessions": "Sessions",
@@ -56,7 +58,8 @@ S = {
     "untitled": "*(untitled)*",
     "no_sessions_found": "*(no sessions found)*",
     "skipped_sessions": "({n} trivial sessions skipped)",
-    "msg_stats_done": "\u2705 Claude Code stats report: {sessions} sessions, total {tokens} tokens \u2192 {path}",
+    "msg_stats_done": "\u2705 Claude Code usage report: {sessions} sessions, total {tokens} tokens \u2192 {path}",
+    "msg_stats_done_cowork": "\u2705 Claude Cowork usage report: {sessions} sessions, total {tokens} tokens \u2192 {path}",
     "warn_no_files": "\u26a0\ufe0f  No JSONL files found, writing empty report.",
 
     # generate_stats.py - tool usage section
