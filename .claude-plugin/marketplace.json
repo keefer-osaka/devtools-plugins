@@ -4,16 +4,13 @@
     "name": "keefer-osaka"
   },
   "metadata": {
-    "description": "Export Claude Code and Cowork chat logs as HTML or Markdown, zip them, and send via Telegram.",
-    "version": "0.1.0"
+    "description": "A collection of Claude Code plugins for developer workflows.",
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "export-chat-logs",
-      "source": {
-        "source": "github",
-        "repo": "keefer-osaka/devtools-plugins"
-      },
+      "source": "./plugins/export-chat-logs",
       "description": "Export Claude Code and Cowork chat logs as HTML or Markdown, zip them, and send via Telegram.",
       "version": "0.1.0",
       "author": {
@@ -23,6 +20,19 @@
       "repository": "https://github.com/keefer-osaka/devtools-plugins",
       "license": "MIT",
       "keywords": ["chat-logs", "export", "telegram", "claude-code", "html", "markdown", "cowork"]
+    },
+    {
+      "name": "protoc-java-gen",
+      "source": "./plugins/protoc-java-gen",
+      "description": "Generate Java from .proto files using a specific protoc version and auto-copy to subprojects.",
+      "version": "0.1.0",
+      "author": {
+        "name": "keefer-osaka"
+      },
+      "homepage": "https://github.com/keefer-osaka/devtools-plugins",
+      "repository": "https://github.com/keefer-osaka/devtools-plugins",
+      "license": "MIT",
+      "keywords": ["protobuf", "protoc", "java", "codegen"]
     }
   ]
 }

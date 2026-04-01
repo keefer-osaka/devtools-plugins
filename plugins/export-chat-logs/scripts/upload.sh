@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# export.sh - Export Claude Code chat logs and send to Telegram
-# Usage: bash export.sh [days=7]
+# upload.sh - Export Claude Code chat logs and send to Telegram
+# Usage: bash upload.sh [days=7]
 
 set -e
 

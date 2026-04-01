@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# save-token.sh - Save Telegram Bot Token, chat_id, timezone offset, language, output format, and Cowork inclusion
-# Usage: bash save-token.sh [token] [chat_id] [timezone_offset] [lang] [format] [include_cowork]
+# save-config.sh - Save Telegram Bot Token, chat_id, timezone offset, language, output format, and Cowork inclusion
+# Usage: bash save-config.sh [token] [chat_id] [timezone_offset] [lang] [format] [include_cowork]
 #   Pass empty string "" or "skip" or "-" to keep the existing value for any argument.
 #   timezone_offset: integer, e.g. 8 for UTC+8 (Taiwan), 9 for UTC+9 (Japan), default 8
 #   lang: en or zh-TW, default en

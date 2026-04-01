@@ -3,7 +3,8 @@
 # Usage: source "$(dirname "$0")/i18n/load.sh"
 
 _I18N_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-_DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devtools-plugins/export-chat-logs"
+_PLUGIN_NAME="$(basename "$(cd "$_I18N_DIR/../.." && pwd)")"
+_DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devtools-plugins/$_PLUGIN_NAME"
 
 _PLUGIN_LANG="en"
 if [ -f "$_DATA_DIR/.env" ]; then

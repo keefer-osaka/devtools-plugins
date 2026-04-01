@@ -16,5 +16,5 @@ Parse the number of days (default 7) and run the export script:
 DAYS=${ARGUMENTS:-7}
 DAYS=$(echo "$DAYS" | grep -o '[0-9]*' | head -1)
 DAYS=${DAYS:-7}
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/export.sh" "$DAYS"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/upload.sh" "$DAYS"
 ```

@@ -57,7 +57,7 @@ Use AskUserQuestion with `multiSelect: true`. In each option's description, show
 }
 ```
 
-For unselected settings, use `skip` when calling `save-token.sh`.
+For unselected settings, use `skip` when calling `save-config.sh`.
 
 ## Step 4 — Bot Token (if selected or first-time)
 
@@ -287,7 +287,7 @@ Map the collected answers to config values:
 Run:
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/save-token.sh" "<token or skip>" "<chat_id or skip>" "<timezone or skip>" "<lang or skip>" "<format or skip>" "<include_cowork or skip>"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/save-config.sh" "<token or skip>" "<chat_id or skip>" "<timezone or skip>" "<lang or skip>" "<format or skip>" "<include_cowork or skip>"
 ```
 
 Stop after configuration is complete — do not proceed with the export flow.
