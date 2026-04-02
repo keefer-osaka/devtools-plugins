@@ -12,12 +12,12 @@ from pathlib import Path
 from common import S, truncate, safe_format_ts, resolve_display_title, converter_main
 
 
-def format_markdown(messages, first_ts, cwd=None, title=None, models=None, source_label=None):
+def format_markdown(messages, first_ts, cwd=None, title=None, models=None, source_label=None, first_user_message=""):
     lines = []
 
     date_str = safe_format_ts(first_ts) if first_ts else ""
 
-    display_title, source_display = resolve_display_title(title, cwd, source_label)
+    display_title, source_display = resolve_display_title(title, cwd, source_label, first_user_message)
     lines.append(f"# {display_title}")
     lines.append("")
 

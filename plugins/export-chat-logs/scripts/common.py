@@ -86,12 +86,25 @@ def compute_active_duration(timestamps) -> float:
     )
 
 
-def resolve_display_title(title, cwd, source_label):
+def _make_preview(text, max_len=40):
+    """Return a short preview of text (first line, truncated). Empty string if nothing useful."""
+    if not text:
+        return ""
+    first_line = text.split("\n")[0].strip()
+    if not first_line:
+        return ""
+    if len(first_line) > max_len:
+        return first_line[:max_len] + "…"
+    return first_line
+
+
+def resolve_display_title(title, cwd, source_label, first_user_message=""):
     """Return (display_title, source_display) based on session source."""
+    preview = _make_preview(first_user_message)
     if source_label == "cowork":
         fallback = cwd.rstrip("/").split("/")[-1] if cwd else "Claude Cowork"
-        return title or fallback, S["source_name_cowork"]
-    return title or "Claude Code", S["source_name"]
+        return title or preview or fallback, S["source_name_cowork"]
+    return title or preview or "Claude Code", S["source_name"]
 
 
 def truncate(text, max_len=MAX_MSG_LEN):
@@ -153,6 +166,7 @@ def parse_session(filepath):
     cache_read = 0
     cache_creation = 0
     tool_counts = {}
+    first_user_message = ""
 
     with open(filepath, encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -214,6 +228,8 @@ def parse_session(filepath):
             text = extract_text_blocks(content)
             if text.strip():
                 messages.append((role, text.strip(), ts))
+                if role == "user" and not first_user_message:
+                    first_user_message = text.strip()
 
     return {
         "messages": messages,
@@ -228,6 +244,7 @@ def parse_session(filepath):
         "cache_read": cache_read,
         "cache_creation": cache_creation,
         "tool_counts": tool_counts,
+        "first_user_message": first_user_message,
     }
 
 
@@ -306,6 +323,7 @@ def converter_main(format_fn, ext):
     title = session["title"]
     cwd = session["cwd"]
     models = session["models"]
+    first_user_message = session.get("first_user_message", "")
     if not first_ts:
         mtime = os.path.getmtime(input_path)
         first_ts = datetime.fromtimestamp(mtime, tz=TZ_LOCAL).isoformat()
@@ -326,7 +344,7 @@ def converter_main(format_fn, ext):
                 sys.exit(0)
         except Exception:
             pass
-    content = format_fn(messages, active_ts, cwd=cwd, title=title, models=models, source_label=source_label)
+    content = format_fn(messages, active_ts, cwd=cwd, title=title, models=models, source_label=source_label, first_user_message=first_user_message)
     os.makedirs(out_dir, exist_ok=True)
     output_path = make_output_path(out_dir, active_ts, title, ext=ext)
     with open(output_path, "w", encoding="utf-8") as f:

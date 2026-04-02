@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from common import S, LANG_CODE, CSS_BASE_VARS, TZ_LOCAL, TZ_LABEL, make_output_path, parse_ts, compute_active_duration, parse_session, is_trivial_stats, is_skill_only_session
+from common import S, LANG_CODE, CSS_BASE_VARS, TZ_LOCAL, TZ_LABEL, make_output_path, parse_ts, compute_active_duration, parse_session, is_trivial_stats, is_skill_only_session, _make_preview
 
 # Category keywords (matched against title + first few user messages)
 CATEGORIES = {
@@ -246,7 +246,7 @@ def _prepare_session_rows(sessions):
                 ts_str = (s["first_ts"] or "")[:16]
         rows.append({
             "ts":     ts_str,
-            "title":  (s["title"] or S["untitled"])[:40],
+            "title":  (s["title"] or _make_preview(s.get("first_user_message", "")) or S["untitled"])[:40],
             "cat":    S.get(f"cat_{s['category']}", s['category']),
             "dur":    fmt_duration(s["duration"]) if s.get("duration") is not None else "-",
             "models": ", ".join(s.get("models") or []) or "-",

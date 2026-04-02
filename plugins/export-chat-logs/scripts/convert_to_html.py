@@ -238,8 +238,8 @@ def _md_to_html(text):
 
 # ── HTML formatter ─────────────────────────────────────────────────────────────
 
-def format_html(messages, first_ts, cwd=None, title=None, models=None, source_label=None):
-    display_title_raw, source_display = resolve_display_title(title, cwd, source_label)
+def format_html(messages, first_ts, cwd=None, title=None, models=None, source_label=None, first_user_message=""):
+    display_title_raw, source_display = resolve_display_title(title, cwd, source_label, first_user_message)
     display_title = _html.escape(display_title_raw)
     lang_attr = LANG_CODE
 
