@@ -13,15 +13,11 @@ ENV_FILE="$DATA_DIR/.env"
 # Load locale strings (before validation so error messages are localized)
 source "$(dirname "$0")/i18n/load.sh"
 
+[ $# -eq 6 ] || { echo "Usage: bash save-config.sh <token> <chat_id> <tz_offset> <lang> <format> <include_cowork>" >&2; exit 2; }
+
 mkdir -p "$DATA_DIR"
 
-# Normalize "skip" / "-" to empty string for all arguments
-[ "$1" = "skip" ] || [ "$1" = "-" ] && set -- "" "${@:2}"
-[ "$2" = "skip" ] || [ "$2" = "-" ] && set -- "$1" "" "${@:3}"
-[ "$3" = "skip" ] || [ "$3" = "-" ] && set -- "$1" "$2" "" "${@:4}"
-[ "$4" = "skip" ] || [ "$4" = "-" ] && set -- "$1" "$2" "$3" "" "${@:5}"
-[ "$5" = "skip" ] || [ "$5" = "-" ] && set -- "$1" "$2" "$3" "$4" "" "$6"
-[ "$6" = "skip" ] || [ "$6" = "-" ] && set -- "$1" "$2" "$3" "$4" "$5" ""
+normalize_skip_args "$@"; set -- "${_NORMALIZED_ARGS[@]}"
 
 # Token: use first argument if provided, otherwise keep existing, otherwise error
 if [ -n "$1" ]; then

@@ -34,6 +34,14 @@ resolve_arg() {
   else echo "$3"; fi
 }
 
+# Helper: interpolate %KEY% placeholders in a message string
+# Usage: fmt "$MSG_TEMPLATE" KEY1 val1 KEY2 val2 ...
+fmt() {
+  local _t="$1"; shift
+  while [ $# -ge 2 ]; do _t="${_t//%$1%/$2}"; shift 2; done
+  printf '%s\n' "$_t"
+}
+
 # Helper: replace "skip" and "-" with "" in positional args (bash 3.2+)
 # Usage: normalize_skip_args "$@"; set -- "${_NORMALIZED_ARGS[@]}"
 normalize_skip_args() {

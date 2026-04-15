@@ -1,0 +1,58 @@
+{
+  "menu": {
+    "questions": [{
+      "question": "請選擇要修改的設定：",
+      "header": "設定",
+      "multiSelect": true,
+      "options": [
+        { "label": "Vault 路徑", "description": "（目前：<CURRENT_VAULT_DIR>）" },
+        { "label": "qmd Binary", "description": "（目前：<CURRENT_QMD_BIN>）" },
+        { "label": "qmd Collection", "description": "（目前：<CURRENT_QMD_COLLECTION>）" },
+        { "label": "語言", "description": "（目前：<CURRENT_LANG>）" }
+      ]
+    }]
+  },
+  "language": {
+    "questions": [{
+      "question": "Select language / 選擇語言 / 言語を選択",
+      "header": "Language",
+      "multiSelect": false,
+      "options": [
+        { "label": "English", "description": "All output in English" },
+        { "label": "繁體中文", "description": "所有輸出使用繁體中文" },
+        { "label": "日本語", "description": "すべての出力を日本語で表示" }
+      ]
+    }]
+  },
+  "all_settings": {
+    "questions": [
+      {
+        "question": "輸入 vault 路徑，或選擇偵測到的路徑。",
+        "header": "Vault 路徑",
+        "multiSelect": false,
+        "options": [
+          { "label": "<DETECTED_VAULT>", "description": "使用偵測到的路徑" },
+          { "label": "其他路徑", "description": "在下方文字欄輸入自訂路徑" }
+        ]
+      },
+      {
+        "question": "選擇 qmd binary 路徑，或在下方文字欄輸入自訂路徑。",
+        "header": "qmd Binary",
+        "multiSelect": false,
+        "options": [
+          { "label": "使用偵測到的路徑", "description": "<DETECTED_QMD>" },
+          { "label": "停用搜尋功能", "description": "不設定 qmd，/obsidian-kb:search 將改讀 wiki/index.md" }
+        ]
+      },
+      {
+        "question": "輸入 qmd collection 名稱，或保留預設值。",
+        "header": "qmd Collection",
+        "multiSelect": false,
+        "options": [
+          { "label": "保留預設（obsidian-wiki）", "description": "qmd update --collection obsidian-wiki" },
+          { "label": "自訂名稱", "description": "在下方文字欄輸入" }
+        ]
+      }
+    ]
+  }
+}

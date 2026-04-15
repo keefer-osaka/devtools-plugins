@@ -1,0 +1,58 @@
+{
+  "menu": {
+    "questions": [{
+      "question": "Select settings to modify:",
+      "header": "Settings",
+      "multiSelect": true,
+      "options": [
+        { "label": "Vault Directory", "description": "(current: <CURRENT_VAULT_DIR>)" },
+        { "label": "Qmd Binary", "description": "(current: <CURRENT_QMD_BIN>)" },
+        { "label": "Qmd Collection", "description": "(current: <CURRENT_QMD_COLLECTION>)" },
+        { "label": "Language", "description": "(current: <CURRENT_LANG>)" }
+      ]
+    }]
+  },
+  "language": {
+    "questions": [{
+      "question": "Select language / 選擇語言 / 言語を選択",
+      "header": "Language",
+      "multiSelect": false,
+      "options": [
+        { "label": "English", "description": "All output in English" },
+        { "label": "繁體中文", "description": "所有輸出使用繁體中文" },
+        { "label": "日本語", "description": "すべての出力を日本語で表示" }
+      ]
+    }]
+  },
+  "all_settings": {
+    "questions": [
+      {
+        "question": "Enter the vault path, or select the detected path.",
+        "header": "Vault Directory",
+        "multiSelect": false,
+        "options": [
+          { "label": "<DETECTED_VAULT>", "description": "Use detected path" },
+          { "label": "Other path", "description": "Type a custom path in the text field below" }
+        ]
+      },
+      {
+        "question": "Select the qmd binary path, or type a custom path in the text field below.",
+        "header": "Qmd Binary",
+        "multiSelect": false,
+        "options": [
+          { "label": "Use detected path", "description": "<DETECTED_QMD>" },
+          { "label": "Skip / disable search", "description": "Without qmd, /obsidian-kb:search will fall back to wiki/index.md" }
+        ]
+      },
+      {
+        "question": "Enter the qmd collection name, or keep the default.",
+        "header": "Qmd Collection",
+        "multiSelect": false,
+        "options": [
+          { "label": "Keep default (obsidian-wiki)", "description": "qmd update --collection obsidian-wiki" },
+          { "label": "Custom name", "description": "Type a custom collection name in the text field below" }
+        ]
+      }
+    ]
+  }
+}

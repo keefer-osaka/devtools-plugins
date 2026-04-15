@@ -8,6 +8,7 @@
 
 | Plugin | 說明 |
 |--------|------|
+| [obsidian-kb](plugins/obsidian-kb/README.zh-TW.md) | 建立並維運 Obsidian 知識庫 vault，內建 kb-ingest / kb-lint / kb-stats skill 與 qmd 驅動的搜尋 |
 | [export-chat-logs](plugins/export-chat-logs/README.zh-TW.md) | 將 Claude Code 與 Cowork 的對話記錄匯出為 HTML 或 Markdown，壓縮後透過 Telegram 傳送 |
 | [protoc-java-gen](plugins/protoc-java-gen/README.zh-TW.md) | 使用指定版本的 protoc 從 `.proto` 檔案產生 Java 程式碼，並自動複製到各子專案 |
 
@@ -22,6 +23,7 @@
 安裝個別 Plugin：
 
 ```
+/plugin install obsidian-kb@devtools-plugins
 /plugin install export-chat-logs@devtools-plugins
 /plugin install protoc-java-gen@devtools-plugins
 ```

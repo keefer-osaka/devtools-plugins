@@ -1,0 +1,58 @@
+{
+  "menu": {
+    "questions": [{
+      "question": "変更する設定を選択してください：",
+      "header": "設定",
+      "multiSelect": true,
+      "options": [
+        { "label": "Vault ディレクトリ", "description": "（現在：<CURRENT_VAULT_DIR>）" },
+        { "label": "qmd Binary", "description": "（現在：<CURRENT_QMD_BIN>）" },
+        { "label": "qmd Collection", "description": "（現在：<CURRENT_QMD_COLLECTION>）" },
+        { "label": "言語", "description": "（現在：<CURRENT_LANG>）" }
+      ]
+    }]
+  },
+  "language": {
+    "questions": [{
+      "question": "Select language / 選擇語言 / 言語を選択",
+      "header": "Language",
+      "multiSelect": false,
+      "options": [
+        { "label": "English", "description": "All output in English" },
+        { "label": "繁體中文", "description": "所有輸出使用繁體中文" },
+        { "label": "日本語", "description": "すべての出力を日本語で表示" }
+      ]
+    }]
+  },
+  "all_settings": {
+    "questions": [
+      {
+        "question": "vault のパスを入力するか、検出されたパスを選択してください。",
+        "header": "Vault ディレクトリ",
+        "multiSelect": false,
+        "options": [
+          { "label": "<DETECTED_VAULT>", "description": "検出されたパスを使用" },
+          { "label": "その他のパス", "description": "下のテキスト欄にカスタムパスを入力" }
+        ]
+      },
+      {
+        "question": "qmd バイナリのパスを選択するか、下のテキスト欄にカスタムパスを入力してください。",
+        "header": "qmd Binary",
+        "multiSelect": false,
+        "options": [
+          { "label": "検出されたパスを使用", "description": "<DETECTED_QMD>" },
+          { "label": "スキップ / 検索を無効化", "description": "qmd なしでは /obsidian-kb:search は wiki/index.md にフォールバック" }
+        ]
+      },
+      {
+        "question": "qmd collection 名を入力するか、デフォルトを維持してください。",
+        "header": "qmd Collection",
+        "multiSelect": false,
+        "options": [
+          { "label": "デフォルトを維持（obsidian-wiki）", "description": "qmd update --collection obsidian-wiki" },
+          { "label": "カスタム名", "description": "下のテキスト欄にカスタム collection 名を入力" }
+        ]
+      }
+    ]
+  }
+}
