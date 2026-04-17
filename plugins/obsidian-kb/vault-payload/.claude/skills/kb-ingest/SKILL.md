@@ -96,6 +96,8 @@ echo '<sessions_json>' | python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/
 - `models`, `messages`, `jsonl_path`
 - `base_transcript`（delta 專用：現有 transcript 的 vault-relative 路徑）
 - `new_derived_pages`（本次新建或更新的 wiki 頁面路徑清單）
+- `author`（作者 slug，例如 `keefer`；scan_sessions.py 自動填入）
+- `source`（來源類型：`"jsonl"` 或 `"md-import"`）
 
 腳本自動處理：建立/更新 transcript、更新 sessions manifest、重建 transcripts 索引。
 詳細欄位說明：`python3 .../upsert_transcripts.py --help`

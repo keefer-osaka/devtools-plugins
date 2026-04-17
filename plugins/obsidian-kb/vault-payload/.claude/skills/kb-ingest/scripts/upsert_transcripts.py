@@ -104,6 +104,8 @@ def main():
                     message_count=entry.get("message_count", 0) + sum(1 for m in session.get("messages", []) if m.get("text", "").strip()),
                     status="processed",
                     derived_pages=new_derived_pages,
+                    author=session.get("author", ""),
+                    source=session.get("source", "jsonl"),
                 )
                 updated += 1
             else:
@@ -131,6 +133,8 @@ def main():
                     derived_pages=new_derived_pages,
                     status="processed",
                     messages=session.get("messages", []),
+                    author=session.get("author", ""),
+                    source=session.get("source", "jsonl"),
                 )
                 Path(transcript_abs).write_text(md, encoding="utf-8")
                 upsert_session_manifest(
@@ -141,6 +145,8 @@ def main():
                     message_count=len(session.get("messages", [])),
                     status="processed",
                     derived_pages=new_derived_pages,
+                    author=session.get("author", ""),
+                    source=session.get("source", "jsonl"),
                 )
                 created += 1
 

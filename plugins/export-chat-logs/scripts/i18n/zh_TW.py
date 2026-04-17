@@ -1,6 +1,5 @@
 S = {
     # convert_to_markdown.py
-    "truncated": "... *（已省略 {n} 個字元）*",
     "label_date": "日期",
     "label_project": "專案",
     "label_source": "來源",

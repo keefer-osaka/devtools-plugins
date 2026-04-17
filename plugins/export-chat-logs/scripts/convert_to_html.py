@@ -11,7 +11,7 @@ import html as _html
 sys.path.insert(0, os.path.dirname(__file__))
 
 from pathlib import Path
-from common import S, LANG_CODE, CSS_BASE_VARS, truncate, safe_format_ts, resolve_display_title, converter_main
+from common import S, LANG_CODE, CSS_BASE_VARS, safe_format_ts, resolve_display_title, converter_main
 
 # ── CSS ────────────────────────────────────────────────────────────────────────
 
@@ -238,10 +238,11 @@ def _md_to_html(text):
 
 # ── HTML formatter ─────────────────────────────────────────────────────────────
 
-def format_html(messages, first_ts, cwd=None, title=None, models=None, source_label=None, first_user_message=""):
+def format_html(messages, first_ts, cwd=None, title=None, models=None, source_label=None, first_user_message="", session_id=""):
     display_title_raw, source_display = resolve_display_title(title, cwd, source_label, first_user_message)
     display_title = _html.escape(display_title_raw)
     lang_attr = LANG_CODE
+    git_user = os.environ.get("GIT_USER_NAME", "")
 
     date_str = safe_format_ts(first_ts) if first_ts else ""
 
@@ -262,11 +263,12 @@ def format_html(messages, first_ts, cwd=None, title=None, models=None, source_la
     if not messages:
         msgs_html_parts.append(f'<p class="no-messages">{_html.escape(S["no_messages"])}</p>')
     else:
-        for role, text, ts in messages:
+        for role, text, ts, uuid in messages:
             ts_str = safe_format_ts(ts, fallback="") if ts else ""
             role_label = S["role_user"] if role == "user" else S["role_assistant"]
-            body_html = _md_to_html(truncate(text))
+            body_html = _md_to_html(text)
             msgs_html_parts.append(
+                f'<!-- uuid: {uuid} -->'
                 f'<div class="message {_html.escape(role)}">'
                 f'<div class="msg-header">'
                 f'<span class="msg-role">{_html.escape(role_label)}</span>'
@@ -294,7 +296,7 @@ def format_html(messages, first_ts, cwd=None, title=None, models=None, source_la
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <style>{_CSS}</style>
 </head>
-<body>
+<body><!-- sid: {session_id} --><!-- git_user: {git_user} -->
   <div class="container">
     <header>
       <h1>{display_title}</h1>

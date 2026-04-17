@@ -42,7 +42,6 @@ def _load_env():
 
 S, LANG_CODE, TZ_LOCAL, TZ_OFFSET = _load_env()
 TZ_LABEL = f"UTC{TZ_OFFSET:+d}"
-MAX_MSG_LEN = 3000
 
 # Shared CSS custom properties (base palette + dark mode) used by HTML output scripts
 CSS_BASE_VARS = """\
@@ -107,12 +106,6 @@ def resolve_display_title(title, cwd, source_label, first_user_message=""):
     return title or preview or "Claude Code", S["source_name"]
 
 
-def truncate(text, max_len=MAX_MSG_LEN):
-    if len(text) <= max_len:
-        return text
-    return text[:max_len] + "\n\n" + S["truncated"].format(n=len(text) - max_len)
-
-
 def clean_string_content(text):
     """Clean string message content: strip control characters, simplify slash command XML."""
     text = re.sub(r'[\x00-\x08\x0b-\x1f\x7f]', '', text).strip()
@@ -167,6 +160,7 @@ def parse_session(filepath):
     cache_creation = 0
     tool_counts = {}
     first_user_message = ""
+    session_id = None
 
     with open(filepath, encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -177,6 +171,11 @@ def parse_session(filepath):
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
+
+            if session_id is None:
+                sid = obj.get("sessionId", "")
+                if sid:
+                    session_id = sid
 
             if obj.get("type") == "custom-title":
                 t = obj.get("customTitle", "").strip()
@@ -194,6 +193,7 @@ def parse_session(filepath):
             msg = obj.get("message", {})
             role = msg.get("role", "")
             ts = obj.get("timestamp", "")
+            uuid = obj.get("uuid", "")
 
             if ts and first_ts is None:
                 first_ts = ts
@@ -227,7 +227,7 @@ def parse_session(filepath):
 
             text = extract_text_blocks(content)
             if text.strip():
-                messages.append((role, text.strip(), ts))
+                messages.append((role, text.strip(), ts, uuid))
                 if role == "user" and not first_user_message:
                     first_user_message = text.strip()
 
@@ -245,6 +245,7 @@ def parse_session(filepath):
         "cache_creation": cache_creation,
         "tool_counts": tool_counts,
         "first_user_message": first_user_message,
+        "session_id": session_id or "",
     }
 
 
@@ -268,7 +269,7 @@ def is_skill_only_session(messages, tool_counts=None):
     """Check if session is a single slash-command invocation with no real discussion."""
     if tool_counts and "AskUserQuestion" in tool_counts:
         return False
-    user_msgs = [text for role, text, _ in messages if role == "user"]
+    user_msgs = [text for role, text, *_ in messages if role == "user"]
     if not user_msgs:
         return True
     if not all(re.match(r"^/\S+\s*$", m) for m in user_msgs):
@@ -344,7 +345,7 @@ def converter_main(format_fn, ext):
                 sys.exit(3)
         except Exception:
             pass
-    content = format_fn(messages, active_ts, cwd=cwd, title=title, models=models, source_label=source_label, first_user_message=first_user_message)
+    content = format_fn(messages, active_ts, cwd=cwd, title=title, models=models, source_label=source_label, first_user_message=first_user_message, session_id=session.get("session_id", ""))
     os.makedirs(out_dir, exist_ok=True)
     output_path = make_output_path(out_dir, active_ts, title, ext=ext)
     with open(output_path, "w", encoding="utf-8") as f:

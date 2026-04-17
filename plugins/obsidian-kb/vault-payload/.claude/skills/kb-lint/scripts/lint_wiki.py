@@ -3,13 +3,14 @@
 kb-lint: 知識庫健康檢查腳本
 
 檢查項目：
-1. canonical_drift  — canonical_files 對照現實漂移
-2. broken_links     — wikilink 指向不存在的頁面
-3. orphaned_pages   — 無任何 wikilink 指向的頁面
-4. missing_sources  — sources 欄位為空
-5. contradicted     — status: contradicted 超過 30 天未處理
-6. index_missing    — 存在於 wiki/ 但未列入 _index.md
-7. stale_pages      — status: stale（超過 90 天未更新）
+1. canonical_drift         — canonical_files 對照現實漂移
+2. broken_links            — wikilink 指向不存在的頁面
+3. orphaned_pages          — 無任何 wikilink 指向的頁面
+4. missing_sources         — sources 欄位為空
+5. contradicted            — status: contradicted 超過 30 天未處理
+6. index_missing           — 存在於 wiki/ 但未列入 _index.md
+7. stale_pages             — status: stale（超過 90 天未更新）
+8. cross_author_conflict   — 跨作者矛盾（contradicted 且多作者，或近 7 天多作者 draft）
 """
 
 import os
@@ -221,6 +222,55 @@ def check_stale(parsed_pages, threshold_days=90):
     return issues
 
 
+def check_cross_author_conflict(parsed_pages, recent_days=7):
+    """
+    第 8 節：跨作者矛盾偵測。
+
+    硬檢查：status=contradicted 且 authors 列表包含 >= 2 位不同作者。
+    軟檢查（advisory）：近 recent_days 天內被兩位以上不同作者加過 sources 但 status 仍 draft。
+
+    回傳 list of (page, kind, detail)。
+    """
+    issues = []
+    for page, _text, fm, _body in parsed_pages:
+        authors = fm.get("authors", [])
+        if isinstance(authors, str):
+            authors = [a.strip() for a in authors.split(",") if a.strip()]
+        unique_authors = set(a for a in authors if a and a != "__local__")
+
+        status = fm.get("status", "")
+
+        # 硬檢查
+        if status == "contradicted" and len(unique_authors) >= 2:
+            issues.append((page, "hard", f"contradicted，作者：{', '.join(sorted(unique_authors))}"))
+            continue
+
+        # 軟檢查：從 sources 欄位找近 recent_days 天的多作者記錄
+        sources = fm.get("sources", [])
+        if not isinstance(sources, list):
+            continue
+        if status != "draft":
+            continue
+        recent_source_authors = set()
+        for src in sources:
+            if not isinstance(src, dict):
+                continue
+            src_author = src.get("author", "")
+            src_date_str = src.get("date", "")
+            if not src_author or not src_date_str:
+                continue
+            try:
+                src_date = datetime.strptime(src_date_str, "%Y-%m-%d").date()
+                if (TODAY - src_date).days <= recent_days:
+                    recent_source_authors.add(src_author)
+            except ValueError:
+                continue
+        if len(recent_source_authors) >= 2:
+            issues.append((page, "advisory", f"draft，近 {recent_days} 天內多作者更新：{', '.join(sorted(recent_source_authors))}"))
+
+    return issues
+
+
 # ── 報告輸出 ──────────────────────────────────────────────────────────────────
 
 def rel(path):
@@ -247,15 +297,21 @@ def _fmt_contradicted(item):
 def _fmt_page(page):
     return f"- `{rel(page)}`"
 
+def _fmt_cross_author_conflict(item):
+    page, kind, detail = item
+    tag = "⚠️ 硬" if kind == "hard" else "ℹ️ 建議"
+    return f"- `{rel(page)}` [{tag}] {detail}"
+
 
 REPORT_SECTIONS = [
-    ("canonical_drift", "1. Canonical Drift",  _fmt_canonical_drift),
-    ("broken_links",    "2. 斷裂連結",          _fmt_broken_link),
-    ("orphaned_pages",  "3. 孤立頁面",          _fmt_page),
-    ("missing_sources", "4. 無來源",            _fmt_page),
-    ("contradicted",    "5. 矛盾未解",          _fmt_contradicted),
-    ("index_missing",   "6. 索引缺漏",          _fmt_page),
-    ("stale_pages",     "7. 過時頁面",          _fmt_page),
+    ("canonical_drift",       "1. Canonical Drift",  _fmt_canonical_drift),
+    ("broken_links",          "2. 斷裂連結",          _fmt_broken_link),
+    ("orphaned_pages",        "3. 孤立頁面",          _fmt_page),
+    ("missing_sources",       "4. 無來源",            _fmt_page),
+    ("contradicted",          "5. 矛盾未解",          _fmt_contradicted),
+    ("index_missing",         "6. 索引缺漏",          _fmt_page),
+    ("stale_pages",           "7. 過時頁面",          _fmt_page),
+    ("cross_author_conflict", "8. 跨作者矛盾",        _fmt_cross_author_conflict),
 ]
 
 
@@ -290,13 +346,14 @@ def main():
         parsed_pages.append((p, text, fm, body))
 
     results = {
-        "canonical_drift": check_canonical_drift(parsed_pages),
-        "broken_links":    check_broken_links(parsed_pages),
-        "orphaned_pages":  check_orphaned_pages(parsed_pages),
-        "missing_sources": check_missing_sources(parsed_pages),
-        "contradicted":    check_contradicted(parsed_pages),
-        "index_missing":   check_index_missing(parsed_pages),
-        "stale_pages":     check_stale(parsed_pages),
+        "canonical_drift":       check_canonical_drift(parsed_pages),
+        "broken_links":          check_broken_links(parsed_pages),
+        "orphaned_pages":        check_orphaned_pages(parsed_pages),
+        "missing_sources":       check_missing_sources(parsed_pages),
+        "contradicted":          check_contradicted(parsed_pages),
+        "index_missing":         check_index_missing(parsed_pages),
+        "stale_pages":           check_stale(parsed_pages),
+        "cross_author_conflict": check_cross_author_conflict(parsed_pages),
     }
 
     report = generate_report(results)

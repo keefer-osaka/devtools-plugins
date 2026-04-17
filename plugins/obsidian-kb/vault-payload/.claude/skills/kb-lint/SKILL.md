@@ -1,6 +1,6 @@
 ---
 name: kb-lint
-description: 知識庫健康檢查。掃描 wiki/ 並輸出 lint-report.md，檢查 canonical drift、斷裂連結、孤立頁面、無來源、矛盾未解、索引缺漏、過時頁面。
+description: 知識庫健康檢查。掃描 wiki/ 並輸出 lint-report.md，檢查 canonical drift、斷裂連結、孤立頁面、無來源、矛盾未解、索引缺漏、過時頁面、跨作者矛盾。
 usage: /kb-lint
 ---
 
@@ -25,6 +25,7 @@ python3 __VAULT_DIR__/.claude/skills/kb-lint/scripts/lint_wiki.py
 | 5 | 矛盾未解 | `status: contradicted` 超過 30 天 |
 | 6 | 索引缺漏 | 存在於 `wiki/` 但未列入任何 `_index.md` |
 | 7 | 過時頁面 | `status: stale` 或超過 90 天未更新 |
+| 8 | 跨作者矛盾 | `status: contradicted` 且有 ≥2 位不同作者（硬）；或近 7 天多作者更新但仍為 `draft`（軟） |
 
 ## Canonical Drift 說明
 

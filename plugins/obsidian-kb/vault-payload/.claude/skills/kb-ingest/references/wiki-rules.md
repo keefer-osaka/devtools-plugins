@@ -16,7 +16,17 @@ wiki/sources/<YYYY-MM-DD>-<topic>.md
 - `status`: single source → `draft`; corroborated by multiple sources → `verified`
 - `confidence`: direct statement → `high`; inferred → `medium`
 - `provenance`: directly extracted → `extracted`; inferred → `inferred`
-- `sources`: include session_id, date, project (cwd); if transcript path is known, also add `transcript:` field
+- `sources`: include session_id, date, project (cwd); if transcript path is known, also add `transcript:` field; also include `author:` when known
+- `authors`: union of all contributor slugs who have added sources to this page; preserve insertion order, deduplicate. Example:
+  ```yaml
+  authors: [keefer, alice]
+  sources:
+    - session: <sid8>
+      author: alice
+      date: 2026-04-17
+      transcript: "[[...]]"
+  ```
+  Existing pages without `authors` → treat as `authors: [__local__]`; backfill real git user slug on next touch.
 
 ## Transcript Reference for New Sessions
 

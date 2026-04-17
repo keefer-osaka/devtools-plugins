@@ -1,6 +1,5 @@
 S = {
     # convert_to_markdown.py
-    "truncated": "... *({n} characters omitted)*",
     "label_date": "Date",
     "label_project": "Project",
     "label_source": "Source",

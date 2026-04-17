@@ -12,7 +12,7 @@
       "name": "export-chat-logs",
       "source": "./plugins/export-chat-logs",
       "description": "Export Claude Code and Cowork chat logs as HTML or Markdown, zip them, and send via Telegram.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "keefer-osaka"
       },
@@ -37,8 +37,8 @@
     {
       "name": "obsidian-kb",
       "source": "./plugins/obsidian-kb",
-      "description": "Obsidian-based persistent knowledge base for Claude Code — installs ingest/lint/stats into your vault, provides cross-directory semantic search via qmd.",
-      "version": "0.1.0",
+      "description": "Obsidian-based persistent knowledge base for Claude Code — installs ingest/lint/stats/import into your vault, supports multi-contributor wiki with author attribution.",
+      "version": "0.2.0",
       "author": {
         "name": "keefer-osaka"
       },

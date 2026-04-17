@@ -9,11 +9,16 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from pathlib import Path
-from common import S, truncate, safe_format_ts, resolve_display_title, converter_main
+from common import S, safe_format_ts, resolve_display_title, converter_main
 
 
-def format_markdown(messages, first_ts, cwd=None, title=None, models=None, source_label=None, first_user_message=""):
+def format_markdown(messages, first_ts, cwd=None, title=None, models=None, source_label=None, first_user_message="", session_id=""):
     lines = []
+
+    git_user = os.environ.get("GIT_USER_NAME", "")
+    lines.append(f"<!-- sid: {session_id} -->")
+    lines.append(f"<!-- git_user: {git_user} -->")
+    lines.append("")
 
     date_str = safe_format_ts(first_ts) if first_ts else ""
 
@@ -38,15 +43,16 @@ def format_markdown(messages, first_ts, cwd=None, title=None, models=None, sourc
         lines.append(S["no_messages"])
         return "\n".join(lines)
 
-    for role, text, ts in messages:
+    for role, text, ts, uuid in messages:
         _ts = safe_format_ts(ts, fallback="") if ts else ""
         ts_str = f" · {_ts}" if _ts else ""
+        lines.append(f"<!-- uuid: {uuid} -->")
         if role == "user":
             lines.append(f"### {S['role_user']}{ts_str}")
         else:
             lines.append(f"### {S['role_assistant']}{ts_str}")
         lines.append("")
-        lines.append(truncate(text))
+        lines.append(text)
         lines.append("")
         lines.append("---")
         lines.append("")

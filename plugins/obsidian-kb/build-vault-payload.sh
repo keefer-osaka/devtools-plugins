@@ -20,7 +20,7 @@ echo "Target:       $SCRIPT_DIR/vault-payload/"
 echo ""
 
 # Verify source exists
-for skill in kb-ingest kb-lint kb-stats; do
+for skill in kb-ingest kb-lint kb-stats kb-import; do
   if [ ! -d "$VAULT_DIR/.claude/skills/$skill" ]; then
     echo "❌ Missing: $VAULT_DIR/.claude/skills/$skill" >&2
     exit 1
@@ -33,6 +33,7 @@ mkdir -p \
   "$PAYLOAD_SKILLS/kb-ingest" \
   "$PAYLOAD_SKILLS/kb-lint" \
   "$PAYLOAD_SKILLS/kb-stats" \
+  "$PAYLOAD_SKILLS/kb-import" \
   "$PAYLOAD_TEMPLATES"
 
 # Sync _lib (shared utilities, no SKILL.md or path templating needed)
@@ -41,9 +42,9 @@ rsync -a --delete --delete-excluded --exclude='__pycache__/' --exclude='*.pyc' \
   "$VAULT_DIR/.claude/skills/_lib/" \
   "$PAYLOAD_SKILLS/_lib/"
 
-# Sync kb-ingest, kb-lint, kb-stats in parallel (SKILL.md + scripts/ per skill)
+# Sync kb-ingest, kb-lint, kb-stats, kb-import in parallel (SKILL.md + scripts/ per skill)
 _pids=()
-for _skill in kb-ingest kb-lint kb-stats; do
+for _skill in kb-ingest kb-lint kb-stats kb-import; do
   (
     echo "→ Syncing ${_skill}..."
     rsync -a --delete --delete-excluded \

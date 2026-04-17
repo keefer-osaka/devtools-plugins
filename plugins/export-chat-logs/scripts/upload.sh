@@ -53,6 +53,11 @@ fi
 # Strip home directory prefix from project folder name (e.g. -Users-user-foo-bar → foo-bar)
 HOME_ENCODED=$(echo "$HOME" | tr '/' '-')
 
+# Export author slug for converter annotation
+export GIT_USER_NAME
+GIT_USER_NAME=$(git config user.name 2>/dev/null | tr ' ' '_')
+GIT_USER_NAME="${GIT_USER_NAME:-$(whoami)}"
+
 # Convert Claude Code sessions (parallel)
 CC_MARK_DIR="$TMPDIR_PATH/.cc_done"
 mkdir -p "$CC_MARK_DIR"

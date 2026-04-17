@@ -16,12 +16,15 @@ from datetime import datetime, timezone
 
 # ── 共用模組（transcript_utils → _lib/wiki_utils）────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LIB_DIR = os.path.join(SCRIPT_DIR, "..", "..", "_lib")
 sys.path.insert(0, SCRIPT_DIR)
+sys.path.insert(0, LIB_DIR)
 from transcript_utils import (
     read_sessions_json, find_jsonl_files,
     PROJECTS_DIR, EXCLUDE_DIRS, EXCLUDE_FILES,
 )
 from wiki_utils import resolve_vault_dir, format_tw_date
+from message_delta import filter_messages_after_uuid
 
 # ── 設定 ──────────────────────────────────────────────────────────────────────
 
@@ -31,6 +34,18 @@ ALL_WATERMARK_PATH = os.path.join(VAULT_DIR, "_schema", ".all_watermark")
 
 MAX_MSG_LEN = 3000
 DEFAULT_LIMIT = 10
+
+import subprocess as _subprocess
+def _git_author_slug():
+    try:
+        name = _subprocess.check_output(
+            ["git", "config", "user.name"], stderr=_subprocess.DEVNULL
+        ).decode().strip()
+        return name.replace(" ", "_") or "unknown"
+    except Exception:
+        return "unknown"
+
+_LOCAL_AUTHOR = _git_author_slug()
 
 # ── 解析工具 ──────────────────────────────────────────────────────────────────
 
@@ -93,7 +108,7 @@ _META_COMMANDS = frozenset({
 def is_skill_only_session(messages, tool_counts=None):
     if tool_counts and "AskUserQuestion" in tool_counts:
         return False
-    user_msgs = [text for role, text, _ in messages if role == "user"]
+    user_msgs = [text for role, text, *_ in messages if role == "user"]
     if not user_msgs:
         return True
     if not all(re.match(r"^/\S+\s*$", m) for m in user_msgs):
@@ -193,14 +208,9 @@ def parse_session(filepath):
     }, None
 
 
-def get_messages_after_uuid(filepath, after_uuid):
-    """
-    讀取 JSONL，回傳 after_uuid 之後的新訊息。
-    回傳 (messages_list, found_pivot)。
-    若 after_uuid 未找到，found_pivot=False。
-    """
-    messages = []
-    found_pivot = False
+def _read_jsonl_messages(filepath):
+    """Read JSONL and return list of message dicts with uuid, role, text, timestamp."""
+    raw = []
     try:
         with open(filepath, encoding="utf-8", errors="ignore") as f:
             for line in f:
@@ -211,34 +221,35 @@ def get_messages_after_uuid(filepath, after_uuid):
                     obj = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-
                 if obj.get("isMeta"):
                     continue
-
-                msg_uuid = obj.get("uuid", "")
                 msg = obj.get("message", {})
                 role = msg.get("role", "")
-                ts = obj.get("timestamp", "")
-
-                if not found_pivot:
-                    if msg_uuid == after_uuid:
-                        found_pivot = True
-                    continue  # skip pivot message itself (already processed)
-
                 if role not in ("user", "assistant"):
                     continue
                 content = msg.get("content", "")
                 text = extract_text_blocks(content)
                 if text.strip():
-                    messages.append({
+                    raw.append({
+                        "uuid": obj.get("uuid", ""),
                         "role": role,
                         "text": truncate(text.strip()),
-                        "timestamp": ts,
+                        "timestamp": obj.get("timestamp", ""),
                     })
     except Exception as e:
         print(f"[WARN] parse failed {filepath}: {e}", file=sys.stderr)
+        return None
+    return raw
+
+
+def get_messages_after_uuid(filepath, after_uuid):
+    """Read JSONL, return (messages_list, found_pivot) for messages after after_uuid."""
+    raw = _read_jsonl_messages(filepath)
+    if raw is None:
         return [], False
-    return messages, found_pivot
+    filtered, found = filter_messages_after_uuid(raw, after_uuid)
+    result = [{"role": m["role"], "text": m["text"], "timestamp": m["timestamp"]} for m in filtered]
+    return result, found
 
 
 # ── 主邏輯 ────────────────────────────────────────────────────────────────────
@@ -353,6 +364,8 @@ def main():
                     "delta": True,
                     "base_transcript": base_transcript,
                     "transcript_stem": os.path.splitext(os.path.basename(base_transcript))[0] if base_transcript else None,
+                    "author": _LOCAL_AUTHOR,
+                    "source": "jsonl",
                 })
                 continue
 
@@ -375,7 +388,6 @@ def main():
             skipped.append({"path": filepath, "reason": "skill-only session"})
             continue
 
-        # 格式化訊息（限制每條訊息長度）
         formatted_messages = []
         for role, text, ts in data["messages"]:
             formatted_messages.append({
@@ -403,6 +415,8 @@ def main():
             "messages": formatted_messages,
             "delta": False,
             "base_transcript": "",
+            "author": _LOCAL_AUTHOR,
+            "source": "jsonl",
         })
 
     output = {

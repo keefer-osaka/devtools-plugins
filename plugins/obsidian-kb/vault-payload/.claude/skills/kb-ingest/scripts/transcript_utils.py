@@ -86,6 +86,8 @@ def render_transcript_md(
     derived_pages: list,
     status: str,
     messages: list,  # [{role, text, timestamp, uuid}]
+    author: str = "",
+    source: str = "jsonl",
 ) -> str:
     """渲染完整 transcript markdown（frontmatter + 對話內容）。"""
 
@@ -101,6 +103,9 @@ def render_transcript_md(
     first_date = format_tw_date(first_ts) or date
     last_date = format_tw_date(last_ts) or date
 
+    author_line = f"\nauthor: {author}" if author else ""
+    source_line = f"\nsource: {source}"
+
     frontmatter = f"""---
 session_id: {session_id}
 title: {title}
@@ -111,7 +116,7 @@ last_ts: {last_ts or ''}
 message_count: {message_count}
 last_processed_msg_uuid: {last_processed_msg_uuid or ''}
 last_processed_at: {last_processed_at}
-models: {models_str}{derived_str}status: {status}
+models: {models_str}{derived_str}status: {status}{author_line}{source_line}
 ---"""
 
     # 標題與 session 摘要行
@@ -174,12 +179,21 @@ def upsert_session_manifest(
     message_count: int,
     status: str,
     derived_pages: list,
+    author: str = "",
+    source: str = "jsonl",
+    author_conflict: bool = False,
 ) -> None:
     """在 manifest dict 中更新或新增 session 條目（in-place）。"""
     existing = manifest.get(session_id, {})
     existing_derived = set(existing.get("derived_pages", []))
     merged_derived = sorted(existing_derived | set(derived_pages))
-    manifest[session_id] = {
+
+    # Detect cross-author conflict: same sid previously stored with different author
+    existing_author = existing.get("author", "")
+    if existing_author and author and existing_author != author:
+        author_conflict = True
+
+    entry = {
         "transcript_path": transcript_path,
         "last_processed_msg_uuid": last_processed_msg_uuid,
         "last_processed_ts": last_processed_ts,
@@ -187,6 +201,13 @@ def upsert_session_manifest(
         "status": status,
         "derived_pages": merged_derived,
     }
+    if author:
+        entry["author"] = author
+    if source:
+        entry["source"] = source
+    if author_conflict:
+        entry["author_conflict"] = True
+    manifest[session_id] = entry
 
 
 # ── Wiki Frontmatter 更新 ─────────────────────────────────────────────────────
