@@ -8,6 +8,7 @@ scan_markdown.py — 解析 export-chat-logs 產生的 zip（或目錄），輸�
   python3 scan_markdown.py               # 掃描 $KB_IMPORT_INBOX 或 ~/Downloads/kb-inbox
 """
 
+import html as _html
 import json
 import os
 import re
@@ -57,6 +58,20 @@ def author_from_dir(dir_path: str) -> str:
 _SID_RE = re.compile(r'<!--\s*sid:\s*([^\s>]+)\s*-->')
 _GIT_USER_RE = re.compile(r'<!--\s*git_user:\s*([^\s>]+)\s*-->')
 _UUID_RE = re.compile(r'<!--\s*uuid:\s*([^\s>]+)\s*-->')
+# Matches each message block in HTML files exported by convert_to_html.py.
+# Depends on the template structure in convert_to_html.py::format_html.
+# If the template changes (class names, DOM order), update this regex too.
+_HTML_MSG_RE = re.compile(
+    r'<!--\s*uuid:\s*([^\s>]+)\s*-->'
+    r'<div class="message\s+(user|assistant)">'
+    r'<div class="msg-header">'
+    r'<span class="msg-role">[^<]*</span>'
+    r'(?:<span class="msg-time">([^<]*)</span>)?'
+    r'</div>'
+    r'<div class="msg-body">(.*?)</div>'
+    r'</div>',
+    re.DOTALL,
+)
 # Match: ### User · 2026-04-17 12:34 UTC+8  or  ### Assistant · ...
 _MSG_HEADING_RE = re.compile(
     r'^###\s+(User|Assistant|使用者|助理|ユーザー|アシスタント)\s*(?:[·•]\s*(.+))?$'
@@ -77,6 +92,98 @@ def _ts_from_heading(ts_str: str) -> str:
     if m:
         return m.group(1)
     return ts_str
+
+
+def _html_to_md(html_str: str) -> str:
+    """Reverse convert_to_html.py::_md_to_html for msg-body content."""
+    code_blocks = []
+
+    def _extract_fence(m):
+        lang_class = m.group(1) or ""
+        lang = re.sub(r'^language-', '', lang_class)
+        body = _html.unescape(m.group(2))
+        code_blocks.append(f"```{lang}\n{body}\n```")
+        return f"\x00CB{len(code_blocks)-1}\x00"
+
+    # Step 1: protect fenced code blocks (with or without language class)
+    html_str = re.sub(
+        r'<pre><code(?:\s+class="([^"]*)")?>(.*?)</code></pre>',
+        _extract_fence, html_str, flags=re.DOTALL,
+    )
+    # Step 2: inline code
+    html_str = re.sub(r'<code>([^<]*)</code>', r'`\1`', html_str)
+    # Step 3: bold+italic (combined first, then individual)
+    html_str = re.sub(r'<strong><em>(.*?)</em></strong>', r'***\1***', html_str, flags=re.DOTALL)
+    html_str = re.sub(r'<strong>(.*?)</strong>', r'**\1**', html_str, flags=re.DOTALL)
+    html_str = re.sub(r'<em>(.*?)</em>', r'*\1*', html_str, flags=re.DOTALL)
+    # Step 4: links
+    html_str = re.sub(r'<a\s+href="([^"]+)"[^>]*>(.*?)</a>', r'[\2](\1)', html_str, flags=re.DOTALL)
+    # Step 5: headings h6→h1 (longest first to avoid partial match)
+    for n in range(6, 0, -1):
+        html_str = re.sub(
+            rf'<h{n}>(.*?)</h{n}>',
+            lambda m, n=n: '#' * n + ' ' + m.group(1),
+            html_str, flags=re.DOTALL,
+        )
+    # Step 6: horizontal rule
+    html_str = html_str.replace('<hr>', '---')
+    # Step 7: list items then ul wrapper
+    html_str = re.sub(r'<li>(.*?)</li>', r'- \1', html_str, flags=re.DOTALL)
+    html_str = re.sub(r'<ul>(.*?)</ul>', lambda m: m.group(1).strip(), html_str, flags=re.DOTALL)
+    # Step 8: blockquotes (strip inner <p> tags then prefix lines with '> ')
+    def _bq(m):
+        inner = re.sub(r'<p>(.*?)</p>', r'\1', m.group(1), flags=re.DOTALL).strip()
+        return '\n'.join('> ' + line for line in inner.split('\n'))
+    html_str = re.sub(r'<blockquote>(.*?)</blockquote>', _bq, html_str, flags=re.DOTALL)
+    # Step 9: paragraphs (after blockquote already stripped its inner <p> tags)
+    html_str = re.sub(r'<p>(.*?)</p>', r'\1\n\n', html_str, flags=re.DOTALL)
+    # Step 10: line breaks
+    html_str = re.sub(r'<br\s*/?>', '\n', html_str)
+    # Step 11: restore code blocks
+    html_str = re.sub(r'\x00CB(\d+)\x00', lambda m: code_blocks[int(m.group(1))], html_str)
+    # Step 12: unescape HTML entities (must be last)
+    return _html.unescape(html_str).strip()
+
+
+def parse_html_file(html_path: str) -> dict | None:
+    """Parse a single session .html file exported by convert_to_html.py."""
+    try:
+        content = open(html_path, encoding="utf-8", errors="ignore").read()
+    except Exception:
+        return None
+
+    # sid and git_user are in the <body> opening tag (~first 2000 chars)
+    head = content[:2000]
+    session_id = ""
+    git_user = ""
+    m = _SID_RE.search(head)
+    if m:
+        session_id = m.group(1)
+    m = _GIT_USER_RE.search(head)
+    if m:
+        git_user = m.group(1)
+
+    messages = []
+    for m in _HTML_MSG_RE.finditer(content):
+        uuid_val = m.group(1)
+        role     = m.group(2)           # "user" or "assistant"
+        ts_str   = (m.group(3) or "").strip()
+        body_html = m.group(4)
+        text = _html_to_md(body_html)
+        if text:
+            messages.append({
+                "uuid": uuid_val,
+                "role": role,
+                "text": text,
+                "timestamp": ts_str,
+            })
+
+    return {
+        "session_id": session_id,
+        "git_user": git_user,
+        "messages": messages,
+        "md_path": html_path,
+    }
 
 
 def parse_md_file(md_path: str) -> dict | None:
@@ -163,14 +270,18 @@ def scan_dir(scan_path: str, author: str) -> list:
 
     for root, _dirs, files in os.walk(scan_path):
         for fname in sorted(files):
-            if not fname.endswith(".md"):
+            if fname.endswith(".md"):
+                parser = parse_md_file
+            elif fname.endswith(".html"):
+                parser = parse_html_file
+            else:
                 continue
             # Skip index/stats files (not per-session)
-            if fname.startswith("_") or fname in ("index.md",):
+            if fname.startswith("_") or fname in ("index.md", "index.html"):
                 continue
 
             md_path = os.path.join(root, fname)
-            parsed = parse_md_file(md_path)
+            parsed = parser(md_path)
             if not parsed:
                 skipped.append({"path": md_path, "reason": "parse failed"})
                 continue
