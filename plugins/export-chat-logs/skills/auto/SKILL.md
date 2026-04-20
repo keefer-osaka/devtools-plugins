@@ -21,6 +21,26 @@ Extract:
 - `CURRENT_CHAT_ID` (present if set)
 - `CURRENT_LANG` (default: `en`)
 
+Then detect existing launchd schedule:
+
+```bash
+PLIST="$HOME/Library/LaunchAgents/com.devtools-plugins.export-chat-logs.plist"
+HAS_EXISTING=0
+if command -v plutil >/dev/null 2>&1 && [ -f "$PLIST" ]; then
+  _W=$(plutil -extract StartCalendarInterval.Weekday raw "$PLIST" 2>/dev/null)
+  _H=$(plutil -extract StartCalendarInterval.Hour raw "$PLIST" 2>/dev/null)
+  _M=$(plutil -extract StartCalendarInterval.Minute raw "$PLIST" 2>/dev/null)
+  if [[ "$_W" =~ ^[0-9]+$ ]] && [[ "$_H" =~ ^[0-9]+$ ]] && [[ "$_M" =~ ^[0-9]+$ ]] \
+     && [ "$_W" -le 7 ] && [ "$_H" -le 23 ] && [ "$_M" -le 59 ]; then
+    [ "$_W" -eq 7 ] && _W=0
+    EXISTING_WEEKDAY=$_W
+    EXISTING_HOUR=$_H
+    EXISTING_MINUTE=$_M
+    HAS_EXISTING=1
+  fi
+fi
+```
+
 **If `CURRENT_TOKEN` or `CURRENT_CHAT_ID` is empty or the file does not exist:**
 Stop and print (EN/ZH-TW/JA trilingual):
 
@@ -40,14 +60,25 @@ Read `"${CLAUDE_PLUGIN_ROOT}/skills/auto/questions/${SETUP_LANG}.json"`, store a
 
 ## Step 3 — Ask schedule time
 
-Default suggestion is Monday 17:00 local time:
-- `SUGGESTED_WEEKDAY` = 1, `SUGGESTED_HOUR` = 17, `SUGGESTED_MINUTE` = 0
-- `SUGGESTED_LOCAL` = EN: `"Every Monday at 5pm"` / ZH-TW: `"每週一下午五點"` / JA: `"毎週月曜日の午後5時"`
+First, load i18n and resolve the suggested time:
 
-Substitute `<SUGGESTED_TIME>` in `Q["schedule_time"]` with `SUGGESTED_LOCAL`, then use AskUserQuestion.
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/i18n/load.sh"
+```
+
+If `HAS_EXISTING == 1`:
+- `SUGGESTED_WEEKDAY = EXISTING_WEEKDAY`, `SUGGESTED_HOUR = EXISTING_HOUR`, `SUGGESTED_MINUTE = EXISTING_MINUTE`
+- `SUGGESTED_LOCAL = $(fmt_schedule_natural $SUGGESTED_WEEKDAY $SUGGESTED_HOUR $SUGGESTED_MINUTE)`
+- Replace `"(Recommended)"` → `"(Keep current)"` / `"（建議）"` → `"（保留現有）"` / `"（推奨）"` → `"（現状維持）"` in the option label after substituting `<SUGGESTED_TIME>`
+
+Else (no existing plist):
+- `SUGGESTED_WEEKDAY = 1`, `SUGGESTED_HOUR = 17`, `SUGGESTED_MINUTE = 0`
+- `SUGGESTED_LOCAL = $(fmt_schedule_natural 1 17 0)`
+
+Substitute `<SUGGESTED_TIME>` in `Q["schedule_time"]` with `SUGGESTED_LOCAL`, apply the Keep current label replacement if applicable, then use AskUserQuestion.
 
 **Handling answers:**
-- Recommended option selected → `FINAL_WEEKDAY = 1`, `FINAL_HOUR = 17`, `FINAL_MINUTE = 0`
+- Recommended / Keep current option selected → `FINAL_WEEKDAY = SUGGESTED_WEEKDAY`, `FINAL_HOUR = SUGGESTED_HOUR`, `FINAL_MINUTE = SUGGESTED_MINUTE`
 - `"Custom time"` / `"自訂時間"` / `"カスタム時間"` selected → wait for text field input
 - Text field input:
   - If it looks like a cron expression (5 space-separated fields, e.g. `30 23 * * 0`) → extract minute, hour, day-of-week fields; treat as local time
@@ -69,25 +100,14 @@ Use `Q["export_days"]` with AskUserQuestion.
 
 ---
 
-## Step 5 — Ask plugin scope
-
-Use `Q["plugin_scope"]` with AskUserQuestion.
-
-**Handling answers:**
-- `"User scope (Recommended)"` / `"使用者範圍（建議）"` / `"ユーザースコープ（推奨）"` → `PROJECT_DIR=""`, `PLUGIN_DIR_PATH=""`
-- `"Project scope"` / `"專案範圍"` / `"プロジェクトスコープ"` → text field input is `PROJECT_DIR` (absolute path); `PLUGIN_DIR_PATH=""`
-- `"Local dev (git clone)"` / `"本機開發（git clone）"` / `"ローカル開発（git clone）"` → text field input is `PLUGIN_DIR_PATH` (absolute path to plugin dir, e.g. `/path/to/devtools-plugins/plugins/export-chat-logs`); `PROJECT_DIR=""`
-
----
-
-## Step 6 — Install launchd agent
+## Step 5 — Install launchd agent
 
 Run:
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-launchd.sh" \
   "$FINAL_WEEKDAY" "$FINAL_HOUR" "$FINAL_MINUTE" \
-  "$DAYS" "${PROJECT_DIR:-skip}" "${PLUGIN_DIR_PATH:-skip}" "$SETUP_LANG"
+  "$DAYS" "${CLAUDE_PLUGIN_ROOT}" "$SETUP_LANG"
 ```
 
 The script handles everything: plist generation, `launchctl` load, summary markdown file, and success message. Print the script's output as-is. No further output needed.

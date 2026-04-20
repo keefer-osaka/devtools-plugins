@@ -177,6 +177,18 @@ Then reinstall in Claude Code:
 
 Restart Claude Code after reinstalling.
 
+### Scheduled export doesn't send Telegram message
+
+Check `~/.config/devtools-plugins/export-chat-logs/launchd.log`:
+
+- **`Unknown skill: export-chat-logs:upload`** — the plist is missing `--plugin-dir`, or the path is stale.
+  Re-run `/export-chat-logs:auto` to regenerate the plist with the current plugin path.
+  This can happen after a plugin upgrade (the marketplace cache path includes the version number).
+
+### After upgrading the plugin
+
+Marketplace-installed plugins are cached at `~/.claude/plugins/cache/devtools-plugins/export-chat-logs/<version>/`. After each upgrade, re-run `/export-chat-logs:auto` so the plist points to the new version path.
+
 ---
 
 ## File Structure

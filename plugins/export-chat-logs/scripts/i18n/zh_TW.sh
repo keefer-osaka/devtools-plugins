@@ -57,3 +57,27 @@ LAUNCHD_MD_LOG="Log"
 LAUNCHD_MD_COMMANDS="## 指令"
 LAUNCHD_MD_TEST="立即測試執行："
 LAUNCHD_MD_REMOVE="移除："
+
+# auto/SKILL.md - 格式化排程時間為自然語言（例如「每週一下午五點」）
+# 用法：fmt_schedule_natural <weekday 0-6> <hour 0-23> <minute 0-59>
+fmt_schedule_natural() {
+  local _w=$1 _h=$2 _m=$3
+  local _day_var="LAUNCHD_DAY_${_w}"
+  local _day="${!_day_var}"
+  local _period _h12
+  if [ "$_h" -lt 6 ]; then _period="凌晨"; _h12=$_h
+  elif [ "$_h" -lt 12 ]; then _period="上午"; _h12=$_h
+  elif [ "$_h" -eq 12 ]; then _period="中午"; _h12=12
+  elif [ "$_h" -lt 19 ]; then _period="下午"; _h12=$((_h - 12))
+  else _period="晚上"; _h12=$((_h - 12))
+  fi
+  local _cn=("" "一" "二" "三" "四" "五" "六" "七" "八" "九" "十" "十一" "十二")
+  local _hour_str="${_cn[$_h12]}"
+  if [ "$_m" -eq 0 ]; then
+    printf "每週%s%s%s點" "$_day" "$_period" "$_hour_str"
+  elif [ "$_m" -eq 30 ]; then
+    printf "每週%s%s%s點半" "$_day" "$_period" "$_hour_str"
+  else
+    printf "每週%s%s%s點%d分" "$_day" "$_period" "$_hour_str" "$_m"
+  fi
+}

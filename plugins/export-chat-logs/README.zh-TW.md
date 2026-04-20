@@ -177,6 +177,18 @@ rm -rf ~/.claude/plugins/cache/devtools-plugins
 
 重新安裝後重啟 Claude Code。
 
+### 排程匯出沒有發送 Telegram 訊息
+
+查看 `~/.config/devtools-plugins/export-chat-logs/launchd.log`：
+
+- **`Unknown skill: export-chat-logs:upload`** — plist 缺少 `--plugin-dir`，或路徑已過時。
+  重新執行 `/export-chat-logs:auto` 以使用目前的 plugin 路徑重新產生 plist。
+  在 plugin 升級後可能發生此問題（marketplace 快取路徑包含版本號碼）。
+
+### 升級 plugin 後
+
+marketplace 安裝的 plugin 快取於 `~/.claude/plugins/cache/devtools-plugins/export-chat-logs/<version>/`。每次升級後，請重新執行 `/export-chat-logs:auto`，使 plist 指向新版本路徑。
+
 ---
 
 ## 檔案結構

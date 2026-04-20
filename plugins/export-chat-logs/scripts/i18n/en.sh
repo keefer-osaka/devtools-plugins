@@ -57,3 +57,22 @@ LAUNCHD_MD_LOG="Log"
 LAUNCHD_MD_COMMANDS="## Commands"
 LAUNCHD_MD_TEST="Test immediately:"
 LAUNCHD_MD_REMOVE="Remove:"
+
+# auto/SKILL.md - format schedule as natural language (e.g. "Every Monday at 5pm")
+# Usage: fmt_schedule_natural <weekday 0-6> <hour 0-23> <minute 0-59>
+fmt_schedule_natural() {
+  local _w=$1 _h=$2 _m=$3
+  local _day_var="LAUNCHD_DAY_${_w}"
+  local _day="${!_day_var}"
+  local _h12 _suffix
+  if [ "$_h" -eq 0 ]; then _h12=12; _suffix="am"
+  elif [ "$_h" -lt 12 ]; then _h12=$_h; _suffix="am"
+  elif [ "$_h" -eq 12 ]; then _h12=12; _suffix="pm"
+  else _h12=$((_h - 12)); _suffix="pm"
+  fi
+  if [ "$_m" -eq 0 ]; then
+    printf "Every %s at %d%s" "$_day" "$_h12" "$_suffix"
+  else
+    printf "Every %s at %d:%02d%s" "$_day" "$_h12" "$_m" "$_suffix"
+  fi
+}

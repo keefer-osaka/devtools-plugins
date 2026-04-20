@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # install-launchd.sh — Write plist, load launchd agent, write summary file
-# Usage: bash install-launchd.sh <weekday> <hour> <minute> <days> <project_dir|skip> <plugin_dir_path|skip> <lang>
+# Usage: bash install-launchd.sh <weekday> <hour> <minute> <days> <plugin_dir_path> <lang>
 #   weekday:          0-7 (launchd: 0 or 7 = Sunday, 1 = Monday, ..., 6 = Saturday)
 #   hour:             0-23 (local time)
 #   minute:           0-59
 #   days:             number of days to cover per export
-#   project_dir:      absolute path to working directory, or "skip"
-#   plugin_dir_path:  absolute path to plugin dir (local dev / git clone), or "skip"
+#   plugin_dir_path:  absolute path to plugin dir (from CLAUDE_PLUGIN_ROOT)
 #   lang:             en | zh-TW | ja
 
 set -euo pipefail
@@ -15,13 +14,8 @@ WEEKDAY="${1:?weekday required}"
 HOUR="${2:?hour required}"
 MINUTE="${3:?minute required}"
 DAYS="${4:?days required}"
-PROJECT_DIR="${5:-skip}"
-PLUGIN_DIR_PATH="${6:-skip}"
-SETUP_LANG="${7:-en}"
-
-# Normalize "skip"
-[ "$PROJECT_DIR"    = "skip" ] && PROJECT_DIR=""
-[ "$PLUGIN_DIR_PATH" = "skip" ] && PLUGIN_DIR_PATH=""
+PLUGIN_DIR_PATH="${5:?plugin_dir_path required}"
+SETUP_LANG="${6:-en}"
 
 # Source locale strings (and fmt() from shared)
 source "$(cd "${BASH_SOURCE[0]%/*}" && pwd)/i18n/load.sh"
@@ -50,6 +44,15 @@ CLAUDE_PATH="$(which claude 2>/dev/null || echo "claude")"
 HOME_PATH="$HOME"
 CLAUDE_DIR="$(dirname "$CLAUDE_PATH")"
 
+# If claude is a wrapper (e.g. cmux), find the real binary directory too
+_REAL_CLAUDE_DIR="$CLAUDE_DIR"
+if [[ -f "$CLAUDE_PATH" ]] && grep -q 'find_real_claude\|cmux' "$CLAUDE_PATH" 2>/dev/null; then
+    while IFS= read -r _dir; do
+        [[ "$_dir" == "$CLAUDE_DIR" ]] && continue
+        [[ -x "$_dir/claude" ]] && _REAL_CLAUDE_DIR="$_dir" && break
+    done < <(printf '%s\n' "$PATH" | tr ':' '\n')
+fi
+
 # Plist constants
 PLIST_LABEL="com.devtools-plugins.export-chat-logs"
 PLIST_FILE="${HOME_PATH}/Library/LaunchAgents/${PLIST_LABEL}.plist"
@@ -59,25 +62,11 @@ LOG_FILE="${HOME_PATH}/.config/devtools-plugins/export-chat-logs/launchd.log"
 mkdir -p "${HOME_PATH}/Library/LaunchAgents"
 mkdir -p "$(dirname "$LOG_FILE")"
 
-# ── Build conditional plist fragments ────────────────────────────────────────
+# ── Build plist fragments ──────────────────────────────────────────────────
 
-# Optional --plugin-dir entries (with trailing newline so the next line aligns)
-if [ -n "$PLUGIN_DIR_PATH" ]; then
-  _PLUGIN_DIR_ENTRIES="        <string>--plugin-dir</string>
+_PLUGIN_DIR_ENTRIES="        <string>--plugin-dir</string>
         <string>${PLUGIN_DIR_PATH}</string>
 "
-else
-  _PLUGIN_DIR_ENTRIES=""
-fi
-
-# Optional WorkingDirectory block (with trailing newline)
-if [ -n "$PROJECT_DIR" ]; then
-  _WORKING_DIR_BLOCK="    <key>WorkingDirectory</key>
-    <string>${PROJECT_DIR}</string>
-"
-else
-  _WORKING_DIR_BLOCK=""
-fi
 
 # ── Write plist ───────────────────────────────────────────────────────────────
 
@@ -118,10 +107,10 @@ ${_PLUGIN_DIR_ENTRIES}        <string>-p</string>
         <key>HOME</key>
         <string>${HOME_PATH}</string>
         <key>PATH</key>
-        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${CLAUDE_DIR}</string>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${CLAUDE_DIR}:${_REAL_CLAUDE_DIR}</string>
     </dict>
 
-${_WORKING_DIR_BLOCK}    <key>RunAtLoad</key>
+    <key>RunAtLoad</key>
     <false/>
 </dict>
 </plist>

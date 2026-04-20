@@ -57,3 +57,23 @@ LAUNCHD_MD_LOG="ログ"
 LAUNCHD_MD_COMMANDS="## コマンド"
 LAUNCHD_MD_TEST="すぐにテスト実行："
 LAUNCHD_MD_REMOVE="削除するには："
+
+# auto/SKILL.md - スケジュールを自然言語でフォーマット（例：「毎週月曜日の午後5時」）
+# 使用法：fmt_schedule_natural <weekday 0-6> <hour 0-23> <minute 0-59>
+fmt_schedule_natural() {
+  local _w=$1 _h=$2 _m=$3
+  local _day_var="LAUNCHD_DAY_${_w}"
+  local _day="${!_day_var}"
+  local _period _h12
+  if [ "$_h" -lt 12 ]; then _period="午前"; _h12=$_h
+  elif [ "$_h" -eq 12 ]; then _period="正午"; _h12=12
+  else _period="午後"; _h12=$((_h - 12))
+  fi
+  if [ "$_m" -eq 0 ]; then
+    printf "毎週%sの%s%d時" "$_day" "$_period" "$_h12"
+  elif [ "$_m" -eq 30 ]; then
+    printf "毎週%sの%s%d時半" "$_day" "$_period" "$_h12"
+  else
+    printf "毎週%sの%s%d時%d分" "$_day" "$_period" "$_h12" "$_m"
+  fi
+}

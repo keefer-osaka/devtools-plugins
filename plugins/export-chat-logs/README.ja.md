@@ -177,6 +177,18 @@ Claude Code で再インストール：
 
 再インストール後は Claude Code を再起動してください。
 
+### スケジュール実行で Telegram メッセージが送信されない
+
+`~/.config/devtools-plugins/export-chat-logs/launchd.log` を確認してください：
+
+- **`Unknown skill: export-chat-logs:upload`** — plist に `--plugin-dir` が含まれていないか、パスが古くなっています。
+  `/export-chat-logs:auto` を再実行して、現在のプラグインパスで plist を再生成してください。
+  プラグインのアップグレード後に発生することがあります（マーケットプレイスのキャッシュパスにはバージョン番号が含まれます）。
+
+### プラグインのアップグレード後
+
+マーケットプレイス経由でインストールされたプラグインは `~/.claude/plugins/cache/devtools-plugins/export-chat-logs/<version>/` にキャッシュされます。アップグレードのたびに `/export-chat-logs:auto` を再実行して、plist が新しいバージョンのパスを指すようにしてください。
+
 ---
 
 ## ファイル構成

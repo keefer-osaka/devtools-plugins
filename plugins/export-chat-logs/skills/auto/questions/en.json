@@ -22,18 +22,5 @@
         { "label": "30 days", "description": "Cover the past month" }
       ]
     }]
-  },
-
-  "plugin_scope": {
-    "questions": [{
-      "question": "Where is the export-chat-logs plugin installed?",
-      "header": "Plugin Scope",
-      "multiSelect": false,
-      "options": [
-        { "label": "User scope (Recommended)", "description": "Installed globally — no project directory needed" },
-        { "label": "Project scope", "description": "Installed in a specific project — enter the project path in the text field below" },
-        { "label": "Local dev (git clone)", "description": "Not installed — enter the plugin directory path in the text field below (e.g. /path/to/devtools-plugins/plugins/export-chat-logs)" }
-      ]
-    }]
   }
 }

@@ -22,18 +22,5 @@
         { "label": "30 日間", "description": "過去 1 か月" }
       ]
     }]
-  },
-
-  "plugin_scope": {
-    "questions": [{
-      "question": "export-chat-logs plugin はどのスコープにインストールされていますか？",
-      "header": "インストール範囲",
-      "multiSelect": false,
-      "options": [
-        { "label": "ユーザースコープ（推奨）", "description": "グローバルインストール — プロジェクトパス不要" },
-        { "label": "プロジェクトスコープ", "description": "特定のプロジェクトにインストール — 下のテキスト欄にそのプロジェクトの絶対パスを入力してください" },
-        { "label": "ローカル開発（git clone）", "description": "未インストール — 下のテキスト欄に plugin ディレクトリのパスを入力してください（例: /path/to/devtools-plugins/plugins/export-chat-logs）" }
-      ]
-    }]
   }
 }
