@@ -219,3 +219,66 @@ class TestParseSession:
         assert err is None
         assert data["input_tokens"] == 10
         assert data["output_tokens"] == 5
+
+
+# ── TestFusedParseJsonl ────────────────────────────────────────────────────────
+
+class TestFusedParseJsonl:
+    def _fixture(self, tmp_path):
+        p = tmp_path / "session.jsonl"
+        _write_jsonl(p, [
+            {"type": "message", "uuid": "uuid-u1", "timestamp": "2026-01-01T00:00:00Z",
+             "cwd": "/proj",
+             "message": {"role": "user", "content": "hello world"}},
+            {"type": "message", "uuid": "uuid-a1", "timestamp": "2026-01-01T00:01:00Z",
+             "message": {"role": "assistant", "content": "hi there",
+                         "usage": {"input_tokens": 8, "output_tokens": 4}}},
+        ])
+        return p
+
+    def test_returns_last_msg_uuid(self, tmp_path):
+        """_fused_parse_jsonl includes last_msg_uuid matching last user/assistant message."""
+        p = self._fixture(tmp_path)
+        data, err = ss._fused_parse_jsonl(str(p))
+        assert err is None
+        assert data is not None
+        assert data["last_msg_uuid"] == "uuid-a1"
+
+    def test_messages_contain_uuid_field(self, tmp_path):
+        """Each message dict in the fused result has a uuid field."""
+        p = self._fixture(tmp_path)
+        data, err = ss._fused_parse_jsonl(str(p))
+        assert err is None
+        for msg in data["messages"]:
+            assert "uuid" in msg
+        assert data["messages"][0]["uuid"] == "uuid-u1"
+        assert data["messages"][1]["uuid"] == "uuid-a1"
+
+    def test_single_open_call(self, tmp_path):
+        """_fused_parse_jsonl opens the JSONL file exactly once (no double-read)."""
+        from unittest.mock import patch as _patch
+        p = self._fixture(tmp_path)
+        target_path = str(p)
+        real_open = open
+        open_count = []
+
+        def _counting_open(file, *args, **kwargs):
+            if str(file) == target_path:
+                open_count.append(1)
+            return real_open(file, *args, **kwargs)
+
+        with _patch("builtins.open", side_effect=_counting_open):
+            data, err = ss._fused_parse_jsonl(target_path)
+
+        assert err is None
+        assert data is not None
+        assert len(open_count) == 1, f"expected 1 open call, got {len(open_count)}"
+
+    def test_metadata_equivalent_to_parse_session(self, tmp_path):
+        """_fused_parse_jsonl and parse_session produce identical metadata."""
+        p = self._fixture(tmp_path)
+        fused, err_f = ss._fused_parse_jsonl(str(p))
+        parsed, err_p = ss.parse_session(str(p))
+        assert err_f is None and err_p is None
+        for key in ("title", "cwd", "first_ts", "last_ts", "input_tokens", "output_tokens"):
+            assert fused[key] == parsed[key], f"mismatch on {key}"

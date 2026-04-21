@@ -210,6 +210,83 @@ def upsert_session_manifest(
     manifest[session_id] = entry
 
 
+# ── Wiki Index ───────────────────────────────────────────────────────────────
+
+def read_wiki_index(vault_dir=None) -> dict | None:
+    """回傳 wiki_index dict 或 None（若不存在或損毀）。"""
+    path = os.path.join(vault_dir or VAULT_DIR, "_schema", "wiki_index.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def write_wiki_index(data: dict, vault_dir=None) -> None:
+    """Atomic write wiki_index.json（tmp + os.replace）。"""
+    path = os.path.join(vault_dir or VAULT_DIR, "_schema", "wiki_index.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+def build_wiki_index_from_scan(wiki_dir=None, vault_dir=None) -> dict:
+    """全量 scan，建立並儲存 wiki_index.json，回傳 index dict。"""
+    wiki_dir = wiki_dir or WIKI_DIR
+    vault_dir = vault_dir or VAULT_DIR
+    wiki_map = scan_wiki_sources(wiki_dir)
+    data = {
+        "schema_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "session_to_wiki": wiki_map,
+    }
+    write_wiki_index(data, vault_dir)
+    return data
+
+
+def backfill_wiki_transcripts_incremental(
+    manifest: dict,
+    wiki_dir: str,
+    touched_session_ids: list,
+    wiki_index: dict | None = None,
+    vault_dir=None,
+) -> int:
+    """
+    Incremental backfill：只處理 touched_session_ids 對應的 wiki 頁面。
+    若 wiki_index 為 None 或 touched 為空，直接 return 0。
+    """
+    if not touched_session_ids:
+        return 0
+    if wiki_index is None:
+        return 0
+
+    vault_dir = vault_dir or VAULT_DIR
+    session_to_transcript = {
+        sid: entry["transcript_path"]
+        for sid, entry in manifest.items()
+        if entry.get("transcript_path")
+    }
+
+    wiki_paths_to_process = set()
+    for sid in touched_session_ids:
+        paths = wiki_index.get("session_to_wiki", {}).get(sid, [])
+        if not paths:
+            print(f"[WARN] session {sid[:8]} not in wiki_index, may need --fsck", file=sys.stderr)
+        else:
+            for rel_path in paths:
+                wiki_paths_to_process.add(os.path.join(vault_dir, rel_path))
+
+    updated = 0
+    for wiki_path in wiki_paths_to_process:
+        if not os.path.exists(wiki_path):
+            print(f"[WARN] wiki page not found: {wiki_path}", file=sys.stderr)
+            continue
+        if add_transcript_to_wiki_sources(wiki_path, session_to_transcript):
+            updated += 1
+    return updated
+
+
 # ── Wiki Frontmatter 更新 ─────────────────────────────────────────────────────
 
 def scan_wiki_sources(wiki_dir: str) -> dict:
@@ -462,6 +539,43 @@ def rebuild_transcripts_index(transcripts_dir: str) -> None:
         except Exception as e:
             print(f"[WARN] rebuild_transcripts_index parse {p.name}: {e}", file=sys.stderr)
             continue
+
+    entries.sort(key=lambda x: x[0], reverse=True)
+
+    lines = [
+        "# Transcripts Index",
+        "",
+        "> 所有 session 的清理後完整對話歸檔。按日期倒序排列。",
+        f"> 最後更新：{datetime.now(TW_TZ).strftime('%Y-%m-%d %H:%M')}",
+        f"> 總計：{len(entries)} 個 transcripts",
+        "",
+        "| 日期 | 標題 | Session | 狀態 |",
+        "|------|------|---------|------|",
+    ]
+    for date, title, session, status, fname in entries:
+        lines.append(f"| {date} | [{title}]({fname}) | `{session}` | {status} |")
+
+    index_path = os.path.join(transcripts_dir, "_index.md")
+    Path(index_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+# ── Manifest-driven Transcripts Index ────────────────────────────────────────
+
+def rebuild_transcripts_index_from_manifest(manifest: dict, transcripts_dir: str) -> None:
+    """重建 transcripts/_index.md（從 manifest，不掃目錄）。"""
+    entries = []
+    for session_id, entry in manifest.items():
+        tp = entry.get("transcript_path", "")
+        if not tp:
+            continue
+        fname = os.path.basename(tp)
+        if fname == "_index.md":
+            continue
+        date = fname[:10] if len(fname) >= 10 else "?"
+        title = entry.get("title", "") or os.path.splitext(fname)[0]
+        short_id = session_id[:8] if session_id else "?"
+        status = entry.get("status", "processed")
+        entries.append((date, title, short_id, status, fname))
 
     entries.sort(key=lambda x: x[0], reverse=True)
 

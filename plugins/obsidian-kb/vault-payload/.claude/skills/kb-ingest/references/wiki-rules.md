@@ -30,7 +30,7 @@ wiki/sources/<YYYY-MM-DD>-<topic>.md
 
 ## Transcript Reference for New Sessions
 
-Each non-trivial new session should have a transcript. The ingest flow generates it via `upsert_transcripts.py` (step 4.5). When adding sources frontmatter, include the transcript wikilink once it exists.
+Each non-trivial new session should have a transcript. The ingest flow generates it via `upsert_transcripts.py`. When adding sources frontmatter, include the transcript wikilink once it exists.
 
 ## Wikilink Syntax in Page Content
 

@@ -46,6 +46,9 @@ from transcript_utils import (
     read_sessions_json, write_sessions_json, upsert_session_manifest,
     rebuild_transcripts_index, make_transcript_filename,
     get_last_message_uuid, backfill_wiki_transcripts,
+    read_wiki_index, write_wiki_index, build_wiki_index_from_scan,
+    backfill_wiki_transcripts_incremental,
+    rebuild_transcripts_index_from_manifest,
 )
 
 
@@ -64,9 +67,18 @@ def main():
         print(json.dumps({"error": "Input must be a JSON array of session objects"}))
         sys.exit(1)
 
+    # CLI flags
+    force_full_scan = "--force-full-scan" in sys.argv or os.environ.get("KB_INGEST_FULL_SCAN") == "1"
+
     manifest = read_sessions_json()
     now_ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     Path(TRANSCRIPTS_DIR).mkdir(exist_ok=True)
+
+    # Eager migration：若 wiki_index.json 不存在，全量掃描建立
+    wiki_index = read_wiki_index()
+    if wiki_index is None and not force_full_scan:
+        print("[kb-ingest] 首次 migration：建立 wiki_index.json（請稍候）...", file=sys.stderr)
+        wiki_index = build_wiki_index_from_scan()
 
     created = 0
     updated = 0
@@ -86,7 +98,9 @@ def main():
                 # Delta session：append 新訊息到現有 transcript
                 base_transcript_rel = session.get("base_transcript", "")
                 transcript_abs = os.path.join(VAULT_DIR, base_transcript_rel)
-                new_last_uuid = get_last_message_uuid(jsonl_path) if jsonl_path else ""
+                new_last_uuid = session.get("last_processed_msg_uuid", "") or (
+                    get_last_message_uuid(jsonl_path) if jsonl_path else ""
+                )
 
                 ok = append_delta_to_transcript(
                     transcript_abs, session.get("messages", []), new_last_uuid
@@ -121,7 +135,9 @@ def main():
                 )
                 transcript_rel = os.path.join("transcripts", fname)
                 transcript_abs = os.path.join(TRANSCRIPTS_DIR, fname)
-                last_uuid = get_last_message_uuid(jsonl_path) if jsonl_path else ""
+                last_uuid = session.get("last_processed_msg_uuid", "") or (
+                    get_last_message_uuid(jsonl_path) if jsonl_path else ""
+                )
                 old_tp = manifest.get(session_id, {}).get("transcript_path", "")
                 if old_tp and old_tp != transcript_rel:
                     old_abs = os.path.join(VAULT_DIR, old_tp)
@@ -164,8 +180,14 @@ def main():
             errors.append(f"{session_id}: {e}")
 
     write_sessions_json(manifest)
-    wiki_linked = backfill_wiki_transcripts(manifest, WIKI_DIR)
-    rebuild_transcripts_index(TRANSCRIPTS_DIR)
+    touched_ids = [s["session_id"] for s in sessions if s.get("session_id")]
+    if force_full_scan:
+        wiki_linked = backfill_wiki_transcripts(manifest, WIKI_DIR)
+        wiki_index = build_wiki_index_from_scan()
+    else:
+        wiki_linked = backfill_wiki_transcripts_incremental(manifest, WIKI_DIR, touched_ids, wiki_index)
+    if created + updated > 0:
+        rebuild_transcripts_index_from_manifest(manifest, TRANSCRIPTS_DIR)
 
     result = {"created": created, "updated": updated, "wiki_linked": wiki_linked}
     if errors:

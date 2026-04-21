@@ -20,7 +20,7 @@ kb-ingest 腳本：`__VAULT_DIR__/.claude/skills/kb-ingest/scripts`
 - `/kb-import --dir <path>` — 目錄下所有 zip，或已解壓的 md 樹
 - `/kb-import`（無參數）— 掃描 `${KB_IMPORT_INBOX:-$HOME/Downloads/kb-inbox}`
 
-## 步驟一：解析 Markdown zip
+## 解析 Markdown zip
 
 根據 `$ARGUMENTS` 決定執行方式——**三選一，不要混用，不要自行 glob 或掃描額外 zip**：
 
@@ -45,9 +45,9 @@ python3 __VAULT_DIR__/.claude/skills/kb-import/scripts/scan_markdown.py
 - 若 md 有 `<!-- sid: ... -->` 注釋 → 做 delta 追蹤（只匯入 `last_processed_msg_uuid` 之後的新訊息）
 - 若無注釋（舊版 zip）→ 退化為全量匯入，不 crash
 
-## 步驟二：逐 Session 分析
+## 逐 Session 分析
 
-使用與 kb-ingest 步驟二相同的流程：
+使用與 kb-ingest『逐 Session 分析』相同的流程：
 
 每個 session 輸出中包含 `delta`、`base_transcript`、`author` 欄位：
 - `"delta": false` — 新 session，全量訊息
@@ -56,11 +56,11 @@ python3 __VAULT_DIR__/.claude/skills/kb-import/scripts/scan_markdown.py
 分析 `messages`，判斷包含哪些有價值的知識。
 **分類標準**：Read `__VAULT_DIR__/.claude/skills/kb-ingest/references/classification.md`
 
-## 步驟三：讀取現有 Wiki
+## 讀取現有 Wiki
 
-在寫入前先讀取相關現有頁面（同 kb-ingest 步驟三）。
+在寫入前先讀取相關現有頁面（同 kb-ingest『讀取現有 Wiki』節）。
 
-## 步驟四：寫入 Wiki 頁面
+## 寫入 Wiki 頁面
 
 **Wiki 頁面寫入規則**：
 Read `__VAULT_DIR__/.claude/skills/kb-ingest/references/wiki-rules.md`
@@ -70,7 +70,7 @@ Read `__VAULT_DIR__/.claude/skills/kb-ingest/references/wiki-rules.md`
 - `sources` 每筆加 `author:` 欄位
 - 既有頁無 `authors` → 視為 `authors: [__local__]`，本次更新時補寫真實作者
 
-## 步驟 4.5：更新 Transcript 與 Sessions Manifest
+## 更新 Transcript 與 Sessions Manifest
 
 所有 wiki 頁面寫入完成後：
 
@@ -82,11 +82,11 @@ echo '<sessions_json>' | python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/
 
 **Cross-author conflict 偵測**：若同一 `session_id` 已有不同 author 的記錄，`upsert_session_manifest` 自動在 sessions.json 加上 `author_conflict: true`。
 
-## 步驟五：更新索引檔
+## 更新索引檔
 
-同 kb-ingest 步驟五（index-formats.md）。
+同 kb-ingest『更新索引檔』節（index-formats.md）。
 
-## 步驟六：刷新 qmd 索引
+## 刷新 qmd 索引
 
 ```bash
 qmd update --collection obsidian-wiki

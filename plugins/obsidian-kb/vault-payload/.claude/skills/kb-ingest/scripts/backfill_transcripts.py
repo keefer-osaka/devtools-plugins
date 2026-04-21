@@ -30,13 +30,13 @@ from transcript_utils import (
     read_sessions_json, write_sessions_json, upsert_session_manifest,
     scan_wiki_sources, add_transcript_to_wiki_sources, backfill_wiki_transcripts,
     rebuild_transcripts_index,
-    find_jsonl_files, get_last_message_uuid,
+    find_jsonl_files,
 )
 # transcript_utils 已將 _lib 加入 sys.path，可直接 import
 from wiki_utils import format_tw_date, extract_fm_text, parse_source_blocks
 
 # 引入 scan_sessions 的解析工具（避免重複程式碼）
-from scan_sessions import parse_session, compute_active_duration, is_skill_only_session
+from scan_sessions import _fused_parse_jsonl, compute_active_duration, is_skill_only_session
 
 
 def main():
@@ -99,8 +99,8 @@ def main():
                 stats["already_exists"] += 1
                 continue
 
-        # 解析 session
-        data, err = parse_session(filepath)
+        # 解析 session（B4：單次讀取，同時取得 metadata / messages / last_uuid）
+        data, err = _fused_parse_jsonl(filepath)
         if err or data is None:
             stats["parse_error"] += 1
             continue
@@ -113,7 +113,8 @@ def main():
             stats["trivial_skip"] += 1
             continue
 
-        if is_skill_only_session(data["messages"], data["tool_counts"]):
+        msg_tuples = [(m["role"], m["text"], m["timestamp"]) for m in data["messages"]]
+        if is_skill_only_session(msg_tuples, data["tool_counts"]):
             stats["skill_only_skip"] += 1
             continue
 
@@ -130,17 +131,17 @@ def main():
 
         session_to_transcript_path[session_id] = transcript_rel_path
 
-        # 取最後一則訊息的 uuid 作為 last_processed_msg_uuid
-        # parse_session 目前不輸出 uuid，需直接從 JSONL 讀最後一條 message 的 uuid
-        last_uuid = get_last_message_uuid(filepath)
+        # B4：_fused_parse_jsonl 已在單次讀取中計算 last_msg_uuid，無需再讀 JSONL
+        last_uuid = data.get("last_msg_uuid", "")
 
         # derived_pages（從反查表取）
         derived_pages = sorted(session_to_wiki_pages.get(session_id, []))
 
-        # 格式化訊息
-        messages_formatted = []
-        for role, text, ts in data["messages"]:
-            messages_formatted.append({"role": role, "text": text, "timestamp": ts})
+        # 格式化訊息（_fused_parse_jsonl messages 已為 dict 格式）
+        messages_formatted = [
+            {"role": m["role"], "text": m["text"], "timestamp": m["timestamp"]}
+            for m in data["messages"]
+        ]
 
         now_ts = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 

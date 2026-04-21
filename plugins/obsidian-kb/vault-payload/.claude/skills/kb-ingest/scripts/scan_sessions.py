@@ -118,7 +118,17 @@ def is_skill_only_session(messages, tool_counts=None):
     return len(skills) <= 1
 
 
-def parse_session(filepath):
+def _fused_parse_jsonl(filepath):
+    """單次掃描 JSONL，同時收集 metadata、messages（含 uuid）、last_msg_uuid。
+
+    Returns:
+        tuple[dict | None, str | None]: (data, error_str)
+        data keys:
+            messages: list of {uuid, role, text, timestamp}
+            title, cwd, first_ts, last_ts, models, msg_timestamps,
+            input_tokens, output_tokens, tool_counts, first_user_message,
+            last_msg_uuid  — uuid of last user/assistant message (may be "")
+    """
     messages = []
     title = None
     cwd = None
@@ -130,6 +140,7 @@ def parse_session(filepath):
     output_tokens = 0
     tool_counts = {}
     first_user_message = ""
+    last_msg_uuid = ""
 
     try:
         with open(filepath, encoding="utf-8", errors="ignore") as f:
@@ -158,6 +169,7 @@ def parse_session(filepath):
                 msg = obj.get("message", {})
                 role = msg.get("role", "")
                 ts = obj.get("timestamp", "")
+                uuid = obj.get("uuid", "")
 
                 if ts and first_ts is None:
                     first_ts = ts
@@ -186,11 +198,22 @@ def parse_session(filepath):
                 if role not in ("user", "assistant"):
                     continue
 
+                # Track last uuid for all user/assistant messages (matches get_last_message_uuid behavior)
+                if uuid:
+                    last_msg_uuid = uuid
+
                 text = extract_text_blocks(content)
                 if text.strip():
-                    messages.append((role, truncate(text.strip()), ts))
+                    t_str = truncate(text.strip())
+                    messages.append({
+                        "uuid": uuid,
+                        "role": role,
+                        "text": t_str,
+                        "timestamp": ts,
+                    })
                     if role == "user" and not first_user_message:
                         first_user_message = text.strip()
+
     except Exception as e:
         return None, f"parse error: {e}"
 
@@ -206,41 +229,37 @@ def parse_session(filepath):
         "output_tokens": output_tokens,
         "tool_counts": tool_counts,
         "first_user_message": first_user_message,
+        "last_msg_uuid": last_msg_uuid,
+    }, None
+
+
+def parse_session(filepath):
+    """Backward-compat wrapper around _fused_parse_jsonl; returns tuple-style messages."""
+    data, err = _fused_parse_jsonl(filepath)
+    if data is None:
+        return None, err
+    tuple_messages = [(m["role"], m["text"], m["timestamp"]) for m in data["messages"]]
+    return {
+        "messages": tuple_messages,
+        "title": data["title"],
+        "cwd": data["cwd"],
+        "first_ts": data["first_ts"],
+        "last_ts": data["last_ts"],
+        "models": data["models"],
+        "msg_timestamps": data["msg_timestamps"],
+        "input_tokens": data["input_tokens"],
+        "output_tokens": data["output_tokens"],
+        "tool_counts": data["tool_counts"],
+        "first_user_message": data["first_user_message"],
     }, None
 
 
 def _read_jsonl_messages(filepath):
-    """Read JSONL and return list of message dicts with uuid, role, text, timestamp."""
-    raw = []
-    try:
-        with open(filepath, encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if obj.get("isMeta"):
-                    continue
-                msg = obj.get("message", {})
-                role = msg.get("role", "")
-                if role not in ("user", "assistant"):
-                    continue
-                content = msg.get("content", "")
-                text = extract_text_blocks(content)
-                if text.strip():
-                    raw.append({
-                        "uuid": obj.get("uuid", ""),
-                        "role": role,
-                        "text": truncate(text.strip()),
-                        "timestamp": obj.get("timestamp", ""),
-                    })
-    except Exception as e:
-        print(f"[WARN] parse failed {filepath}: {e}", file=sys.stderr)
+    """Backward-compat wrapper; returns [{uuid, role, text, timestamp}] or None."""
+    data, _ = _fused_parse_jsonl(filepath)
+    if data is None:
         return None
-    return raw
+    return data["messages"]
 
 
 def get_messages_after_uuid(filepath, after_uuid):
@@ -331,22 +350,31 @@ def main():
         last_processed_uuid = (manifest_entry or {}).get("last_processed_msg_uuid", "")
         base_transcript = (manifest_entry or {}).get("transcript_path", "")
 
+        data = None  # 若 delta 分支已解析，可供 fallthrough 重用（避免二次讀取）
+
         if last_processed_uuid:
-            # Delta 模式：只取 pivot 之後的新訊息
-            delta_messages, found_pivot = get_messages_after_uuid(filepath, last_processed_uuid)
+            # Delta 模式：單次 _fused_parse_jsonl，再用 filter_messages_after_uuid 切取新訊息
+            data, err = _fused_parse_jsonl(filepath)
+            if err or data is None:
+                skipped.append({"path": filepath, "reason": err or "parse failed"})
+                continue
+
+            filtered, found_pivot = filter_messages_after_uuid(data["messages"], last_processed_uuid)
+
             if not found_pivot:
                 # Pivot UUID 不在 JSONL 中（可能 session 被重寫），fallthrough 到一般解析
+                # data 已可用，不需再讀檔案
                 last_processed_uuid = ""
-            elif not delta_messages:
+            elif not filtered:
                 # 無新訊息
                 skipped.append({"path": filepath, "reason": "already processed, no delta"})
                 continue
             else:
-                # 有 delta：仍需 parse_session() 取 metadata
-                data, err = parse_session(filepath)
-                if err or data is None:
-                    skipped.append({"path": filepath, "reason": err or "parse failed"})
-                    continue
+                # 有 delta
+                delta_messages = [
+                    {"role": m["role"], "text": m["text"], "timestamp": m["timestamp"]}
+                    for m in filtered
+                ]
                 date_str = format_tw_date(data["first_ts"]) if data["first_ts"] else ""
                 results.append({
                     "session_id": session_id,
@@ -367,14 +395,16 @@ def main():
                     "transcript_stem": os.path.splitext(os.path.basename(base_transcript))[0] if base_transcript else None,
                     "author": _LOCAL_AUTHOR,
                     "source": "jsonl",
+                    "last_processed_msg_uuid": data["last_msg_uuid"],
                 })
                 continue
 
-        # 一般模式（新 session）
-        data, err = parse_session(filepath)
-        if err or data is None:
-            skipped.append({"path": filepath, "reason": err or "parse failed"})
-            continue
+        # 一般模式（新 session，或 delta fallthrough 時重用已解析的 data）
+        if data is None:
+            data, err = _fused_parse_jsonl(filepath)
+            if err or data is None:
+                skipped.append({"path": filepath, "reason": err or "parse failed"})
+                continue
 
         # 判斷 trivial
         total_tokens = data["input_tokens"] + data["output_tokens"]
@@ -385,17 +415,17 @@ def main():
             skipped.append({"path": filepath, "reason": "trivial (low tokens/duration)"})
             continue
 
-        if is_skill_only_session(data["messages"], data["tool_counts"]):
+        # is_skill_only_session 需要 tuple-style messages
+        messages_as_tuples = [(m["role"], m["text"], m["timestamp"]) for m in data["messages"]]
+        if is_skill_only_session(messages_as_tuples, data["tool_counts"]):
             skipped.append({"path": filepath, "reason": "skill-only session"})
             continue
 
-        formatted_messages = []
-        for role, text, ts in data["messages"]:
-            formatted_messages.append({
-                "role": role,
-                "text": text,
-                "timestamp": ts,
-            })
+        formatted_messages = [
+            {"role": m["role"], "text": m["text"], "timestamp": m["timestamp"]}
+            for m in data["messages"]
+            if m["text"].strip()
+        ]
 
         # 計算日期
         date_str = format_tw_date(data["first_ts"]) if data["first_ts"] else ""
@@ -422,6 +452,7 @@ def main():
             )[0],
             "author": _LOCAL_AUTHOR,
             "source": "jsonl",
+            "last_processed_msg_uuid": data["last_msg_uuid"],
         })
 
     output = {

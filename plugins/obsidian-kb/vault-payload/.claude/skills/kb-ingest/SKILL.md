@@ -13,7 +13,7 @@ Vault 根目錄：`__VAULT_DIR__`
 Wiki 目錄：`__VAULT_DIR__/wiki`
 Skill 腳本：`__VAULT_DIR__/.claude/skills/kb-ingest/scripts`
 
-## 步驟一：掃描 Sessions
+## 掃描 Sessions
 
 執行掃描腳本，取得待處理的 sessions：
 
@@ -34,7 +34,7 @@ python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/scan_sessions.py -a -n 20
 
 > **`--all` 模式注意**：`scan_sessions.py` 執行時已自動推進 `.all_watermark` 游標，無需手動呼叫 `update_all_watermark.py`。
 
-## 步驟二：逐 Session 分析
+## 逐 Session 分析
 
 每個 session 輸出中現在包含 `delta` 和 `base_transcript` 欄位：
 
@@ -44,9 +44,9 @@ python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/scan_sessions.py -a -n 20
 **Delta session 的處理規則：**
 1. 先 Read `base_transcript` 的 frontmatter（取 `derived_pages` 清單，了解已建立的 wiki 頁面）
 2. 只對 `messages` 中的新訊息做知識分類判斷
-3. 若 delta 觸發既有 wiki 頁面更新 → 正常走步驟四的矛盾偵測
-4. 若 delta 產生新 wiki 頁面 → 正常建立，並在步驟 4.5 更新 transcript 的 `derived_pages`
-5. 把 delta 訊息 append 到 transcript（步驟 4.5 的任務）
+3. 若 delta 觸發既有 wiki 頁面更新 → 正常走『寫入 Wiki 頁面』節的矛盾偵測
+4. 若 delta 產生新 wiki 頁面 → 正常建立，並在『更新 Transcript 與 Sessions Manifest』節更新 transcript 的 `derived_pages`
+5. 把 delta 訊息 append 到 transcript（『更新 Transcript 與 Sessions Manifest』節的任務）
 6. 更新 `_schema/sessions.json` 條目
 
 **⚠️ Transcript wikilink（新 session 與 delta session 均適用）**：
@@ -59,7 +59,7 @@ python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/scan_sessions.py -a -n 20
 對每個 session 分析其 `messages` 欄位，判斷包含哪些有價值的知識。
 **分類標準**：Read `__VAULT_DIR__/.claude/skills/kb-ingest/references/classification.md`
 
-## 步驟三：讀取現有 Wiki
+## 讀取現有 Wiki
 
 在寫入前，先讀取相關的現有頁面：
 
@@ -70,7 +70,7 @@ python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/scan_sessions.py -a -n 20
 # Glob wiki/entities/*.md 確認現有實體
 ```
 
-## 步驟四：寫入 Wiki 頁面
+## 寫入 Wiki 頁面
 
 **Wiki 頁面寫入規則**（frontmatter、衝突偵測、更新策略）：
 Read `__VAULT_DIR__/.claude/skills/kb-ingest/references/wiki-rules.md`
@@ -84,7 +84,7 @@ wiki/troubleshooting/<問題名稱>.md
 wiki/sources/<YYYY-MM-DD>-<主題>.md
 ```
 
-## 步驟 4.5：更新 Transcript 與 Sessions Manifest
+## 更新 Transcript 與 Sessions Manifest
 
 所有 wiki 頁面寫入完成後，將本批次處理的 sessions 整理成 JSON，透過 stdin 傳給腳本：
 
@@ -103,12 +103,12 @@ echo '<sessions_json>' | python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/
 腳本自動處理：建立/更新 transcript、更新 sessions manifest、重建 transcripts 索引。
 詳細欄位說明：`python3 .../upsert_transcripts.py --help`
 
-## 步驟五：更新索引檔
+## 更新索引檔
 
 **索引格式規範**（_index.md / hot.md / log.md）：
 Read `__VAULT_DIR__/.claude/skills/kb-ingest/references/index-formats.md`
 
-## 步驟 5.1：更新 overview.md
+## 更新 overview.md
 
 ```bash
 python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/update_overview.py
@@ -120,7 +120,7 @@ python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/update_overview.py
 - 若本批 ingest 出現新的重要 entity/concept 或主題轉向 → Edit `wiki/overview.md` 的 `## 主要主題` 段
 - `## 近期重點`：append 一條，格式 `- YYYY-MM-DD：<本批 ingest 重點>`，保留最近 3–5 條
 
-## 步驟六：更新水位線
+## 更新水位線
 
 所有頁面寫入完成後：
 
@@ -131,7 +131,7 @@ python3 __VAULT_DIR__/.claude/skills/kb-ingest/scripts/update_watermark.py
 
 > **`--all` 模式**：`.all_watermark` 已由 `scan_sessions.py` 自動推進，此處無需額外呼叫 `update_all_watermark.py`。
 
-## 步驟七：刷新 qmd 索引
+## 刷新 qmd 索引
 
 所有頁面寫入完成後，刷新 qmd 搜尋索引讓新頁面立即可被查詢：
 

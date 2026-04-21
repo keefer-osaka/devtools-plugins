@@ -505,3 +505,176 @@ def test_add_transcript_no_frontmatter_returns_false(tmp_path):
 
     result = tu.add_transcript_to_wiki_sources(wiki_path, {"sid-001": "foo.md"})
     assert result is False
+
+
+# ── P2: wiki_index read/write/build/incremental ───────────────────────────────
+
+def _make_wiki_page_with_session(path, session_id):
+    path.write_text(
+        f"---\ntitle: test\nsources:\n  - session: {session_id}\n    date: 2026-04-21\n---\n# test\n",
+        encoding="utf-8",
+    )
+
+
+def test_read_wiki_index_returns_none_when_missing(tmp_path):
+    result = tu.read_wiki_index(str(tmp_path))
+    assert result is None
+
+
+def test_write_read_wiki_index_roundtrip(tmp_path):
+    (tmp_path / "_schema").mkdir()
+    data = {"schema_version": 1, "generated_at": "2026-04-21T00:00:00Z", "session_to_wiki": {"sid-x": ["wiki/p.md"]}}
+    tu.write_wiki_index(data, str(tmp_path))
+    result = tu.read_wiki_index(str(tmp_path))
+    assert result == data
+
+
+def test_write_wiki_index_atomic(tmp_path, monkeypatch):
+    """If os.replace crashes after .tmp write, wiki_index.json must not exist."""
+    (tmp_path / "_schema").mkdir()
+    import os
+    original_replace = os.replace
+
+    def crash_replace(src, dst):
+        if dst.endswith("wiki_index.json"):
+            raise RuntimeError("simulated crash")
+        return original_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", crash_replace)
+    with pytest.raises(RuntimeError):
+        tu.write_wiki_index({"schema_version": 1, "session_to_wiki": {}}, str(tmp_path))
+
+    assert not (tmp_path / "_schema" / "wiki_index.json").exists()
+
+
+def test_build_wiki_index_from_scan_creates_file(tmp_path, monkeypatch):
+    vault = tmp_path / "vault"
+    (vault / "wiki").mkdir(parents=True)
+    (vault / "_schema").mkdir()
+    _make_wiki_page_with_session(vault / "wiki" / "p.md", "sid-abc")
+    monkeypatch.setattr(tu, "VAULT_DIR", str(vault))
+    monkeypatch.setattr(tu, "WIKI_DIR", str(vault / "wiki"))
+
+    result = tu.build_wiki_index_from_scan(str(vault / "wiki"), str(vault))
+    assert result["schema_version"] == 1
+    assert "sid-abc" in result["session_to_wiki"]
+    assert (vault / "_schema" / "wiki_index.json").exists()
+
+
+def test_backfill_incremental_noop_when_no_touched(tmp_path):
+    manifest = {"sid-a": {"transcript_path": "transcripts/t.md"}}
+    wiki_index = {"session_to_wiki": {"sid-a": ["wiki/p.md"]}}
+    result = tu.backfill_wiki_transcripts_incremental(manifest, str(tmp_path / "wiki"), [], wiki_index, str(tmp_path))
+    assert result == 0
+
+
+def test_backfill_incremental_noop_when_index_none(tmp_path):
+    manifest = {"sid-a": {"transcript_path": "transcripts/t.md"}}
+    result = tu.backfill_wiki_transcripts_incremental(manifest, str(tmp_path / "wiki"), ["sid-a"], None, str(tmp_path))
+    assert result == 0
+
+
+def test_backfill_incremental_only_touches_mapped_pages(tmp_path):
+    vault = tmp_path / "vault"
+    (vault / "wiki").mkdir(parents=True)
+    _make_wiki_page_with_session(vault / "wiki" / "page_a.md", "sid-a")
+    _make_wiki_page_with_session(vault / "wiki" / "page_b.md", "sid-b")
+
+    manifest = {
+        "sid-a": {"transcript_path": "transcripts/2026-04-21-sida-title.md"},
+        "sid-b": {"transcript_path": "transcripts/2026-04-21-sidb-title.md"},
+    }
+    wiki_index = {
+        "session_to_wiki": {
+            "sid-a": ["wiki/page_a.md"],
+            "sid-b": ["wiki/page_b.md"],
+        }
+    }
+
+    result = tu.backfill_wiki_transcripts_incremental(
+        manifest, str(vault / "wiki"), ["sid-a"], wiki_index, str(vault)
+    )
+    assert result == 1
+    content_a = (vault / "wiki" / "page_a.md").read_text(encoding="utf-8")
+    assert "transcript:" in content_a
+    content_b = (vault / "wiki" / "page_b.md").read_text(encoding="utf-8")
+    assert "transcript:" not in content_b
+
+
+def test_backfill_incremental_skips_already_has_transcript(tmp_path):
+    vault = tmp_path / "vault"
+    (vault / "wiki").mkdir(parents=True)
+    (vault / "wiki" / "p.md").write_text(
+        "---\ntitle: t\nsources:\n  - session: sid-c\n    date: 2026-04-21\n    transcript: \"[[foo]]\"\n---\n# t\n",
+        encoding="utf-8",
+    )
+    manifest = {"sid-c": {"transcript_path": "transcripts/foo.md"}}
+    wiki_index = {"session_to_wiki": {"sid-c": ["wiki/p.md"]}}
+
+    result = tu.backfill_wiki_transcripts_incremental(
+        manifest, str(vault / "wiki"), ["sid-c"], wiki_index, str(vault)
+    )
+    assert result == 0
+
+
+# ── P3: rebuild_transcripts_index_from_manifest ───────────────────────────────
+
+def test_rebuild_from_manifest_produces_index(tmp_path):
+    transcripts_dir = tmp_path / "transcripts"
+    transcripts_dir.mkdir()
+    manifest = {
+        "sid-1": {"transcript_path": "transcripts/2026-04-21-sid1-title.md", "title": "Title One", "status": "processed"},
+    }
+    tu.rebuild_transcripts_index_from_manifest(manifest, str(transcripts_dir))
+    content = (transcripts_dir / "_index.md").read_text(encoding="utf-8")
+    assert "Title One" in content
+    assert "| 日期 | 標題 | Session | 狀態 |" in content
+
+
+def test_rebuild_from_manifest_sort_desc_by_date(tmp_path):
+    transcripts_dir = tmp_path / "transcripts"
+    transcripts_dir.mkdir()
+    manifest = {
+        "sid-a": {"transcript_path": "transcripts/2026-01-01-sida-old.md", "title": "Old", "status": "processed"},
+        "sid-b": {"transcript_path": "transcripts/2026-04-21-sidb-new.md", "title": "New", "status": "processed"},
+        "sid-c": {"transcript_path": "transcripts/2025-12-31-sidc-oldest.md", "title": "Oldest", "status": "processed"},
+    }
+    tu.rebuild_transcripts_index_from_manifest(manifest, str(transcripts_dir))
+    content = (transcripts_dir / "_index.md").read_text(encoding="utf-8")
+    dates = re.findall(r'\| (\d{4}-\d{2}-\d{2}) \|', content)
+    assert dates == sorted(dates, reverse=True)
+
+
+def test_rebuild_from_manifest_matches_legacy_output(tmp_path):
+    """manifest-driven and filesystem-scan outputs match (ignoring timestamp line)."""
+    transcripts_dir = tmp_path / "transcripts"
+    transcripts_dir.mkdir()
+
+    fname1 = "2026-04-21-aabbccdd-first.md"
+    fname2 = "2026-04-20-11223344-second.md"
+
+    (transcripts_dir / fname1).write_text(
+        "---\nsession_id: aabbccdd1234\ntitle: First\ndate: 2026-04-21\nstatus: processed\n---\n# First\n",
+        encoding="utf-8",
+    )
+    (transcripts_dir / fname2).write_text(
+        "---\nsession_id: 112233441234\ntitle: Second\ndate: 2026-04-20\nstatus: processed\n---\n# Second\n",
+        encoding="utf-8",
+    )
+
+    # Legacy output
+    tu.rebuild_transcripts_index(str(transcripts_dir))
+    legacy = (transcripts_dir / "_index.md").read_text(encoding="utf-8")
+
+    # Manifest-driven output
+    manifest = {
+        "aabbccdd1234": {"transcript_path": f"transcripts/{fname1}", "title": "First", "status": "processed"},
+        "112233441234": {"transcript_path": f"transcripts/{fname2}", "title": "Second", "status": "processed"},
+    }
+    tu.rebuild_transcripts_index_from_manifest(manifest, str(transcripts_dir))
+    new_out = (transcripts_dir / "_index.md").read_text(encoding="utf-8")
+
+    def drop_ts(text):
+        return [l for l in text.splitlines() if not l.startswith("> 最後更新：")]
+
+    assert drop_ts(legacy) == drop_ts(new_out)
