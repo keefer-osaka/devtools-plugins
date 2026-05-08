@@ -15,6 +15,10 @@ updated: {{YYYY-MM-DD}}
 
 # {{YYYY-MM-DD}} {{主題}}
 
+## TL;DR
+
+<!-- 一句話摘要：核心決策或成果 -->
+
 ## Session 資訊
 
 - **Session ID**：{{session-id}}

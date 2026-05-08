@@ -326,6 +326,44 @@ def check_broken_session_refs(parsed_pages, manifest):
     return issues
 
 
+_SOURCES_DIR_NAME = "sources"
+_PLACEHOLDER_RE = re.compile(r'^\s*(\{\{[^}]*\}\}|<!--.*?-->)\s*$', re.DOTALL)
+
+
+def check_missing_tldr(parsed_pages):
+    """第 11 節：wiki/sources/ 下每個頁面 body 的第一個 H2 必須是 ## TL;DR，
+    且 TL;DR block 內容非空、非 placeholder。
+    回傳 list of (page, reason)。
+    reason: missing | first_h2_not_tldr:<title> | empty | placeholder
+    """
+    issues = []
+    for page, _text, _fm, body in parsed_pages:
+        try:
+            rel_parts = page.relative_to(WIKI_DIR).parts
+        except ValueError:
+            continue
+        if not rel_parts or rel_parts[0] != _SOURCES_DIR_NAME:
+            continue
+        h2_match = re.search(r'^##\s+(.+?)\s*$', body, re.MULTILINE)
+        if not h2_match:
+            issues.append((page, "missing"))
+            continue
+        first_h2 = h2_match.group(1).strip()
+        if first_h2 != "TL;DR":
+            issues.append((page, f"first_h2_not_tldr:{first_h2}"))
+            continue
+        after = body[h2_match.end():]
+        next_h2 = re.search(r'^##\s', after, re.MULTILINE)
+        tldr_block = after[:next_h2.start()] if next_h2 else after
+        tldr_text = tldr_block.strip()
+        if not tldr_text:
+            issues.append((page, "empty"))
+            continue
+        if _PLACEHOLDER_RE.match(tldr_text):
+            issues.append((page, "placeholder"))
+    return issues
+
+
 # ── 報告輸出 ──────────────────────────────────────────────────────────────────
 
 def rel(path):
@@ -370,6 +408,21 @@ def _fmt_broken_session_ref(item):
     return base
 
 
+def _fmt_missing_tldr(item):
+    page, reason = item
+    if reason == "missing":
+        msg = "缺少 TL;DR 標題（body 無任何 ## H2）"
+    elif reason.startswith("first_h2_not_tldr:"):
+        msg = f"第一個 H2 不是 TL;DR（實際：`{reason.split(':', 1)[1]}`）"
+    elif reason == "empty":
+        msg = "TL;DR 內容為空"
+    elif reason == "placeholder":
+        msg = "TL;DR 仍為 placeholder（{{...}} 或 HTML 註解）"
+    else:
+        msg = reason
+    return f"- `{rel(page)}` — {msg}"
+
+
 REPORT_SECTIONS = [
     ("canonical_drift",       "1. Canonical Drift",  _fmt_canonical_drift),
     ("broken_links",          "2. 斷裂連結",          _fmt_broken_link),
@@ -381,6 +434,7 @@ REPORT_SECTIONS = [
     ("cross_author_conflict", "8. 跨作者矛盾",        _fmt_cross_author_conflict),
     ("duplicate_fm_keys",    "9. 重複 frontmatter key", _fmt_duplicate_fm_keys),
     ("broken_session_refs",  "10. 斷裂 session 引用",  _fmt_broken_session_ref),
+    ("missing_tldr",         "11. Source 缺 TL;DR",    _fmt_missing_tldr),
 ]
 
 
@@ -427,6 +481,7 @@ def main():
         "cross_author_conflict": check_cross_author_conflict(parsed_pages),
         "duplicate_fm_keys":     check_duplicate_fm_keys(parsed_pages),
         "broken_session_refs":   check_broken_session_refs(parsed_pages, manifest),
+        "missing_tldr":          check_missing_tldr(parsed_pages),
     }
 
     report = generate_report(results)

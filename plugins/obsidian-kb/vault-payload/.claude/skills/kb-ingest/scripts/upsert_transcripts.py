@@ -126,7 +126,7 @@ def main():
                 # 新 session：建立 transcript
                 messages = session.get("messages", [])
                 if not messages:
-                    print(f"[skip] empty session {session_id[:8]}... (no messages)", file=sys.stderr)
+                    print(f"[skip] empty session {session_id[:12]}... (no messages)", file=sys.stderr)
                     continue
                 fname = make_transcript_filename(
                     session.get("first_ts", ""),

@@ -67,11 +67,11 @@ def run_fsck(wiki_dir=None, sessions_json_path=None, vault_dir=None, fix=False, 
         sessions = read_sessions_json()
         for sid in current_map:
             if sid not in sessions:
-                cross_issues.append(f"session {sid[:8]} in index but not in sessions.json")
+                cross_issues.append(f"session {sid[:12]} in index but not in sessions.json")
             for rel_path in current_map[sid]:
                 abs_path = os.path.join(vault_dir, rel_path)
                 if not os.path.exists(abs_path):
-                    cross_issues.append(f"dangling: {rel_path} (session {sid[:8]})")
+                    cross_issues.append(f"dangling: {rel_path} (session {sid[:12]})")
         report["cross_issues"] = cross_issues[:20]
         if cross_issues:
             has_drift = True

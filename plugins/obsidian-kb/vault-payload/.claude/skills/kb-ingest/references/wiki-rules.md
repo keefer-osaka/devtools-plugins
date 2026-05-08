@@ -11,6 +11,11 @@ wiki/troubleshooting/<problem-name>.md
 wiki/sources/<YYYY-MM-DD>-<topic>.md
 ```
 
+### Source Page Body
+
+`wiki/sources/*.md` 的第一個內容節**必須**是 `## TL;DR`，緊接 frontmatter 之後。
+內容為一句話摘要核心決策或成果，**不得為空白或 placeholder**（`{{...}}` 或 HTML comment 原文）。
+
 ## Frontmatter Rules
 
 - `status`: single source → `draft`; corroborated by multiple sources → `verified`

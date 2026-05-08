@@ -46,6 +46,29 @@ EXCLUDE_DIRS = {"subagents", "memory"}
 EXCLUDE_FILES = {"audit.jsonl"}
 
 
+# ── Session ID helpers ────────────────────────────────────────────────────────
+
+_TS_RE = re.compile(r'^(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3})')
+
+
+def _short_id(session_id: str) -> str:
+    """用於檔名：UUID→8碼；timestamp→23碼（確保唯一）"""
+    if not session_id:
+        return "unknown"
+    m = _TS_RE.match(session_id)
+    return m.group(1) if m else session_id[:8]
+
+
+def _display_id(session_id: str, max_len: int = 12) -> str:
+    """用於顯示/log：UUID→8碼；timestamp→前12碼（控制表格寬度）"""
+    if not session_id:
+        return "unknown"
+    m = _TS_RE.match(session_id)
+    if m:
+        return m.group(1)[:max_len]
+    return session_id[:8]
+
+
 # ── Slug 與檔名 ───────────────────────────────────────────────────────────────
 
 def make_slug(text: str, max_len: int = 40) -> str:
@@ -61,9 +84,14 @@ def make_slug(text: str, max_len: int = 40) -> str:
 
 
 def make_transcript_filename(first_ts: str, session_id: str, title: str) -> str:
-    """生成 transcript 檔名：YYYY-MM-DD-<session前8碼>-<slug>.md"""
-    date_str = format_tw_date(first_ts) or "0000-00-00"
-    short_id = session_id[:8] if session_id else "unknown"
+    """生成 transcript 檔名：YYYY-MM-DD-<short_id>-<slug>.md"""
+    date_str = format_tw_date(first_ts)
+    if not date_str:
+        m = _TS_RE.match(session_id or "")
+        if m:
+            date_str = m.group(1)[:10]
+    date_str = date_str or "0000-00-00"
+    short_id = _short_id(session_id)
     slug = make_slug(title or session_id)
     return f"{date_str}-{short_id}-{slug}.md"
 
@@ -150,7 +178,7 @@ models: {models_str}{derived_str}status: {status}{author_line}{source_line}{orig
     header = f"""
 # {title}
 
-> Session `{session_id[:8]}`｜{date_range}｜{message_count} messages
+> Session `{_display_id(session_id)}`｜{date_range}｜{message_count} messages
 
 """
 
@@ -333,7 +361,7 @@ def backfill_wiki_transcripts_incremental(
     for sid in touched_session_ids:
         paths = wiki_index.get("session_to_wiki", {}).get(sid, [])
         if not paths:
-            print(f"[WARN] session {sid[:8]} not in wiki_index, may need --fsck", file=sys.stderr)
+            print(f"[WARN] session {_display_id(sid)} not in wiki_index, may need --fsck", file=sys.stderr)
         else:
             for rel_path in paths:
                 wiki_paths_to_process.add(os.path.join(vault_dir, rel_path))
@@ -612,7 +640,7 @@ def rebuild_transcripts_index(transcripts_dir: str) -> None:
             status_m = re.search(r'^status:\s*(.+)$', fm, re.MULTILINE)
             title = title_m.group(1).strip() if title_m else p.stem
             date = date_m.group(1).strip() if date_m else "?"
-            session = session_m.group(1).strip()[:8] if session_m else "?"
+            session = _display_id(session_m.group(1).strip()) if session_m else "?"
             status = status_m.group(1).strip() if status_m else "?"
             entries.append((date, title, session, status, p.name))
         except Exception as e:
@@ -652,7 +680,7 @@ def rebuild_transcripts_index_from_manifest(manifest: dict, transcripts_dir: str
             continue
         date = fname[:10] if len(fname) >= 10 else "?"
         title = entry.get("title", "") or os.path.splitext(fname)[0]
-        short_id = session_id[:8] if session_id else "?"
+        short_id = _display_id(session_id) if session_id else "?"
         status = entry.get("status", "processed")
         entries.append((date, title, short_id, status, fname))
 

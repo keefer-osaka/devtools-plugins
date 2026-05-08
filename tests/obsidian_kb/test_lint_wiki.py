@@ -412,3 +412,59 @@ class TestFindAllIndexEntries:
     def test_empty_wiki_dir_returns_empty(self, monkeypatch, tmp_path):
         monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
         assert lw.find_all_index_entries() == set()
+
+
+# ── TestCheckMissingTldr ──────────────────────────────────────────────────────
+
+def _make_sources_page(wiki_dir, name="foo.md", body="", fm=None):
+    """建立絕對路徑的 sources/ 頁面 tuple；不實際 touch 檔案（check_missing_tldr 不讀檔）。"""
+    return (wiki_dir / "sources" / name, "", fm or {}, body)
+
+
+class TestCheckMissingTldr:
+    def test_non_sources_page_ignored(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
+        page = (tmp_path / "concepts" / "foo.md", "", {}, "just prose with no h2")
+        issues = lw.check_missing_tldr([page])
+        assert issues == []
+
+    def test_missing_h2_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
+        page = _make_sources_page(tmp_path, body="just prose")
+        issues = lw.check_missing_tldr([page])
+        assert len(issues) == 1
+        assert issues[0] == (page[0], "missing")
+
+    def test_first_h2_not_tldr_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
+        page = _make_sources_page(tmp_path, body="## Summary\n\ntext")
+        issues = lw.check_missing_tldr([page])
+        assert len(issues) == 1
+        assert issues[0] == (page[0], "first_h2_not_tldr:Summary")
+
+    def test_empty_tldr_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
+        page = _make_sources_page(tmp_path, body="## TL;DR\n\n## Next")
+        issues = lw.check_missing_tldr([page])
+        assert len(issues) == 1
+        assert issues[0] == (page[0], "empty")
+
+    def test_placeholder_double_brace_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
+        page = _make_sources_page(tmp_path, body="## TL;DR\n{{summary}}\n")
+        issues = lw.check_missing_tldr([page])
+        assert len(issues) == 1
+        assert issues[0] == (page[0], "placeholder")
+
+    def test_placeholder_html_comment_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
+        page = _make_sources_page(tmp_path, body="## TL;DR\n<!-- TODO -->\n")
+        issues = lw.check_missing_tldr([page])
+        assert len(issues) == 1
+        assert issues[0] == (page[0], "placeholder")
+
+    def test_valid_tldr_clean(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(lw, "WIKI_DIR", tmp_path)
+        page = _make_sources_page(tmp_path, body="## TL;DR\n\n本頁主題說明...\n\n## Body")
+        issues = lw.check_missing_tldr([page])
+        assert issues == []
