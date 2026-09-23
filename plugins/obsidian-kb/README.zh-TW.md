@@ -2,6 +2,8 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
+> **⚠️ 已停止維護。** v0.4.2 為最終版本。Claude Code 內建的 auto memory 已涵蓋本 plugin 大部分用途；現有功能仍可使用，但不再新增功能或修正問題。
+
 Claude Code 的持久記憶知識庫，以 Obsidian 為儲存層。自動從對話歷史萃取知識，整理成結構化 wiki，並支援跨目錄語意搜尋。
 
 ## 功能概述

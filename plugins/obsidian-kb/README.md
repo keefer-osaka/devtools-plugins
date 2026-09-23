@@ -2,6 +2,8 @@
 
 [繁體中文](README.zh-TW.md) | [日本語](README.ja.md)
 
+> **⚠️ No longer maintained.** v0.4.2 is the final release. Claude Code's built-in auto memory now covers most of this plugin's use case. It still works as-is, but no further features or fixes are planned.
+
 Persistent knowledge base for Claude Code, built on Obsidian. Extracts knowledge from your Claude Code conversation history, stores it in a structured wiki, and makes it searchable from any working directory.
 
 ## Overview
