@@ -38,7 +38,7 @@
       "name": "obsidian-kb",
       "source": "./plugins/obsidian-kb",
       "description": "Obsidian-based persistent knowledge base for Claude Code — installs ingest/lint/stats/import into your vault, supports multi-contributor wiki with author attribution.",
-      "version": "0.4.0",
+      "version": "0.4.2",
       "author": {
         "name": "keefer-osaka"
       },
